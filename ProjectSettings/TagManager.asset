@@ -1,0 +1,61 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!78 &1
+TagManager:
+  serializedVersion: 2
+  tags: []
+  layers:
+  - Default
+  - TransparentFX
+  - Ignore Raycast
+  - Border
+  - Water
+  - UI
+  - groundLayer
+  - Enemy Layer
+  - PlayerLayer
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  m_SortingLayers:
+  - name: Default
+    uniqueID: 0
+    locked: 0
+  - name: Bg
+    uniqueID: 3622927629
+    locked: 0
+  - name: Environment
+    uniqueID: 945395741
+    locked: 0
+  - name: Character
+    uniqueID: 332736119
+    locked: 0
+  - name: Trap
+    uniqueID: 2962840479
+    locked: 0
+  - name: Floor
+    uniqueID: 610816259
+    locked: 0
+  - name: ForBg
+    uniqueID: 3482483495
+    locked: 0
