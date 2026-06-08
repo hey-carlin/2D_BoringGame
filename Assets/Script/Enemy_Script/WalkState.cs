@@ -5,7 +5,11 @@ namespace Enemy
     public class WalkState : EnemyState
     {
         private float enterTime;
-        private const float arriveThreshold = 0.25f; // 到达巡逻点阈值
+        private const float arriveThreshold = 0.25f;
+        private const float flipCooldown = 0.4f;
+        private float lastFlipTime = -999f;
+        private const float blockedFlipCooldown = 0.6f;
+        private float lastBlockedFlipTime = -999f;
 
         public WalkState(EnemyController enemy, StateMachine stateMachine)
             : base(enemy, stateMachine) { }
@@ -13,28 +17,34 @@ namespace Enemy
         public override void OnEnter()
         {
             enterTime = Time.time;
+            lastFlipTime = Time.time;
+            lastBlockedFlipTime = Time.time;
 
-            // 如果处于追击模式，朝向玩家；否则使用两点巡逻或水平随机
-            if (enemy.isChasing && enemy.player != null)
+            if (enemy.patrolPointA != null && enemy.patrolPointB != null)
             {
-                Vector2 dir = (enemy.player.position - enemy.transform.position).normalized;
-                dir.y = 0f;
-                enemy.movement.SetMoveDirection(dir);
-            }
-            else if (enemy.patrolPointA != null && enemy.patrolPointB != null)
-            {
-                // 使用 patrol 点
-                if (enemy.currentPatrolTarget == null) enemy.currentPatrolTarget = enemy.patrolPointA;
+                if (enemy.currentPatrolTarget == null)
+                    enemy.currentPatrolTarget = enemy.patrolPointA;
+
                 Vector2 dir = (enemy.currentPatrolTarget.position - enemy.transform.position);
                 dir.y = 0f;
-                enemy.movement.SetMoveDirection(dir.normalized);
+                if (dir.sqrMagnitude > 0.0001f)
+                    enemy.movement.SetMoveDirection(dir.normalized);
             }
             else
             {
-                // 退回到水平随机方向，避免 vertical 分量
-                float vx = Random.Range(-1f, 1f);
-                Vector2 dir = new Vector2(vx, 0f);
-                enemy.movement.SetMoveDirection(dir);
+                // 有巡逻点但只有一个或两个都没有的情况，随机选一个方向
+                if (enemy.currentPatrolTarget != null)
+                {
+                    Vector2 dir = (enemy.currentPatrolTarget.position - enemy.transform.position);
+                    dir.y = 0f;
+                    if (dir.sqrMagnitude > 0.0001f)
+                        enemy.movement.SetMoveDirection(dir.normalized);
+                }
+                else
+                {
+                    float vx = Random.Range(0f, 1f) > 0.5f ? 1f : -1f;
+                    enemy.movement.SetMoveDirection(new Vector2(vx, 0f));
+                }
             }
 
             enemy.animator.Play("Walk");
@@ -42,81 +52,58 @@ namespace Enemy
 
         public override void OnUpdate()
         {
-            float distToPlayer = Vector2.Distance(enemy.transform.position, enemy.player.position);
-
-            // 优先攻击
-            if (distToPlayer <= enemy.data.attackRange)
-            {
-                stateMachine.ChangeState(enemy.attackState);
+            // 检测玩家期间暂停巡逻，由 DetectionRoutine 控制移动
+            if (enemy.detectionInProgress)
                 return;
+
+            // 被障碍物挡住或行走超时，切换巡逻目标（在 HandlePatrol 之前，避免干扰抵达判断）
+            if (Time.time - lastBlockedFlipTime > blockedFlipCooldown)
+            {
+                if (enemy.movement.IsBlocked() || Time.time - enterTime >= enemy.data.walkDuration)
+                {
+                    lastBlockedFlipTime = Time.time;
+                    enterTime = Time.time;
+                    enemy.SwitchToNextPatrolTarget();
+                }
             }
 
-            // 追击逻辑：每帧修正方向；超出 patrolRange 在 controller 中处理
-            if (enemy.isChasing)
+            // 持续朝巡逻目标移动（可能在此切换到 IdleState）
+            HandlePatrol();
+        }
+
+        private void HandlePatrol()
+        {
+            if (enemy.currentPatrolTarget != null)
             {
-                if (enemy.player != null)
-                {
-                    Vector2 dir = (enemy.player.position - enemy.transform.position);
-                    dir.y = 0f;
+                // ✅ 核心修复：每帧持续朝巡逻目标修正方向，确保严格走到目标点
+                Vector2 dir = (enemy.currentPatrolTarget.position - enemy.transform.position);
+                dir.y = 0f;
+                if (dir.sqrMagnitude > 0.0001f)
                     enemy.movement.SetMoveDirection(dir.normalized);
+
+                float d = Vector2.Distance(enemy.transform.position, enemy.currentPatrolTarget.position);
+                if (d <= arriveThreshold)
+                {
+                    if (Time.time - lastFlipTime > flipCooldown)
+                    {
+                        lastFlipTime = Time.time;
+                        // ✅ 到达巡逻点 → 进入待机暂停 → IdleState 负责翻转和目标切换
+                        stateMachine.ChangeState(enemy.idleState);
+                    }
                 }
             }
-
-            // 非追击巡逻行为：两点巡逻或随机水平
-            if (!enemy.isChasing)
+            else
             {
-                if (enemy.patrolPointA != null && enemy.patrolPointB != null && enemy.currentPatrolTarget != null)
-                {
-                    float d = Vector2.Distance(enemy.transform.position, enemy.currentPatrolTarget.position);
-                    // 到达目标时切换
-                    if (d <= arriveThreshold)
-                    {
-                        enemy.SwitchToNextPatrolTarget();
-                        Vector2 dir = (enemy.currentPatrolTarget.position - enemy.transform.position);
-                        dir.y = 0f;
-                        enemy.movement.SetMoveDirection(dir.normalized);
-                    }
-                    else
-                    {
-                        // 如果前方没有地面或被障碍阻挡，切换目标
-                        Vector2 lookDir = (enemy.currentPatrolTarget.position - enemy.transform.position);
-                        Vector2 horizDir = new Vector2(Mathf.Sign(lookDir.x), 0f);
-                        bool groundAhead = enemy.movement.IsGroundAhead(horizDir, 0.6f, 1.2f);
-                        if (!groundAhead || enemy.movement.IsBlocked())
-                        {
-                            enemy.SwitchToNextPatrolTarget();
-                            Vector2 dir = (enemy.currentPatrolTarget.position - enemy.transform.position);
-                            dir.y = 0f;
-                            enemy.movement.SetMoveDirection(dir.normalized);
-                        }
-                    }
-                }
-                else
-                {
-                    // 随机水平巡逻：如果要走到边缘则反向
-                    Vector2 currentDir = new Vector2(Mathf.Sign(enemy.movement.CurrentDirectionX), 0f);
-                    bool groundAhead = enemy.movement.IsGroundAhead(currentDir, 0.6f, 1.2f);
-                    if (!groundAhead || enemy.movement.IsBlocked())
-                    {
-                        // 反向
-                        Vector2 reverse = new Vector2(-Mathf.Sign(currentDir.x), 0f);
-                        enemy.movement.SetMoveDirection(reverse);
-                    }
-                }
+                // 无巡逻目标：自由漫游，前方无地面或被挡住时翻转
+                Vector2 currentDir = new Vector2(Mathf.Sign(enemy.movement.CurrentDirection.x), 0f);
+                bool groundAhead = enemy.movement.IsGroundAhead(currentDir, 0.6f, 1.2f);
 
-                // 若玩家出现在 sightRange 内，进入追击（保障）
-                if (distToPlayer <= enemy.data.sightRange)
+                if ((!groundAhead || enemy.movement.IsBlocked()) && Time.time - lastFlipTime > flipCooldown)
                 {
-                    enemy.StartChase();
+                    lastFlipTime = Time.time;
+                    Vector2 reverse = new Vector2(-Mathf.Sign(currentDir.x), 0f);
+                    enemy.movement.SetMoveDirection(reverse);
                 }
-            }
-
-            // 非追击超时或撞墙回 idle（保持原逻辑）
-            if (!enemy.isChasing && (enemy.movement.IsBlocked() ||
-                Time.time - enterTime >= enemy.data.walkDuration))
-            {
-                stateMachine.ChangeState(enemy.idleState);
-                return;
             }
         }
 

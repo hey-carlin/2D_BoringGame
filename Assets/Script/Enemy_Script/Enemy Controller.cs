@@ -1,11 +1,12 @@
-﻿using UnityEngine;
+﻿using System.Collections;
+using UnityEngine;
 
 namespace Enemy
 {
     public class EnemyController : MonoBehaviour
     {
         [Header("Data")]
-        public EnemyData data;   // ✅ Inspector 挂载
+        public EnemyData data;
 
         [Header("Components")]
         public Animator animator;
@@ -16,7 +17,6 @@ namespace Enemy
         [HideInInspector] public int currentHealth;
 
         public IdleState idleState;
-        public AlertState alertState;
         public WalkState walkState;
         public AttackState attackState;
         public DeadState deadState;
@@ -31,13 +31,8 @@ namespace Enemy
         public GroundCheck groundChecker;
 
         private Vector2 patrolCenter;
-
-        public bool IsGrounded =>
-            groundChecker != null && groundChecker.IsGrounded;
-
-        // 追击相关
-        internal bool isChasing = false;
-        internal float patrolRange = 0f; // 追击停止范围（玩家离开时停止追击）
+        internal float patrolRange = 0f;
+        internal bool detectionInProgress = false;
 
         void Awake()
         {
@@ -51,48 +46,14 @@ namespace Enemy
             stateMachine = new StateMachine();
 
             idleState = new IdleState(this, stateMachine);
-            alertState = new AlertState(this, stateMachine);
             walkState = new WalkState(this, stateMachine);
             attackState = new AttackState(this, stateMachine);
             deadState = new DeadState(this, stateMachine);
 
             stateMachine.AddState(idleState);
-            stateMachine.AddState(alertState);
             stateMachine.AddState(walkState);
             stateMachine.AddState(attackState);
             stateMachine.AddState(deadState);
-        }
-
-        void Update()
-        {
-            if (player == null) return;
-
-            float dist = Vector2.Distance(transform.position, player.position);
-            Debug.Log($"[{gameObject.name}] Dist: {dist}, Sight: {data.sightRange}, Attack: {data.attackRange}, Chasing: {isChasing}");
-
-            // 每帧让状态机更新
-            stateMachine.OnUpdate();
-
-            // 检测玩家进入视野并位于巡逻区域内才会追击
-            if (!isChasing && IsPlayerInSight() && IsPlayerInsidePatrolArea())
-            {
-                StartChase();
-            }
-
-            // 如果正在追击，检测玩家是否已经超出巡逻/追击范围或离开巡逻区域，超出则停止追击
-            if (isChasing)
-            {
-                float d = Vector2.Distance(transform.position, player.position);
-                if (d > patrolRange || !IsPlayerInsidePatrolArea())
-                {
-                    StopChase();
-                }
-            }
-        }
-
-        void FixedUpdate()
-        {
-            stateMachine.OnFixedUpdate();
         }
 
         void Start()
@@ -101,43 +62,94 @@ namespace Enemy
             stateMachine.ChangeState(walkState);
         }
 
+        void Update()
+        {
+            if (player == null) return;
+
+            float dist = Vector2.Distance(transform.position, player.position);
+            Debug.Log($"[{name}] Dist:{dist}");
+
+            stateMachine.OnUpdate();
+
+            // 如果玩家触碰敌人前方的检测线并在巡逻区域内，则短暂播放 Idle 过渡后执行攻击
+            var cur = stateMachine.GetCurrentState();
+            if (IsPlayerOnChaseLine() && IsPlayerInsidePatrolArea())
+            {
+                if (cur != attackState && cur != deadState && !detectionInProgress)
+                {
+                    StartCoroutine(DetectionRoutine());
+                }
+            }
+        }
+
+        private IEnumerator DetectionRoutine()
+        {
+            detectionInProgress = true;
+
+            float elapsed = 0f;
+            while (elapsed < data.alertDuration)
+            {
+                if (player == null)
+                {
+                    detectionInProgress = false;
+                    yield break;
+                }
+
+                // 检测期间朝玩家移动，缩短距离以触发攻击
+                Vector2 dir = (player.position - transform.position);
+                dir.y = 0f;
+                if (dir.sqrMagnitude > 0.0001f)
+                    movement.SetMoveDirection(dir.normalized);
+
+                // 提前进入攻击范围则立即攻击
+                if (IsPlayerInAttackRange())
+                {
+                    detectionInProgress = false;
+                    stateMachine.ChangeState(attackState);
+                    yield break;
+                }
+
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            // 警报时间结束，再次检查是否在攻击范围
+            if (IsPlayerInAttackRange())
+            {
+                stateMachine.ChangeState(attackState);
+            }
+            else
+            {
+                var cur = stateMachine.GetCurrentState();
+                if (cur != walkState)
+                    stateMachine.ChangeState(walkState);
+            }
+
+            detectionInProgress = false;
+        }
+
+        void FixedUpdate()
+        {
+            stateMachine.OnFixedUpdate();
+        }
+
         private void InitFromData()
         {
             currentHealth = data.maxHealth;
-
-            movement.Init(data.moveSpeed, data.sightRange);
+            movement.Init(data.moveSpeed, data.chaseRange);
             attack.Init(data.damage, data.attackRange);
 
-            // patrolRange 使用 sightRange 的倍数作为回退值（如果你在 EnemyData 中后续添加专门字段可替换）
             patrolRange = data.sightRange * 2f;
-
-            // 记录巡逻中心点（用于无明确 patrolPoint 时的范围判断）
             patrolCenter = transform.position;
 
-            // 初始化巡逻点（若存在）
             if (patrolPointA != null)
                 currentPatrolTarget = patrolPointA;
             else if (patrolPointB != null)
                 currentPatrolTarget = patrolPointB;
         }
 
-        public void StartChase()
-        {
-            isChasing = true;
-            // 立即面向玩家，然后进入待机/警戒状态
-            if (player != null)
-                movement.FaceDirection((player.position - transform.position).normalized);
-            stateMachine.ChangeState(alertState);
-        }
+        // Deprecated chase methods removed; detection uses front-line and AlertState transition.
 
-        public void StopChase()
-        {
-            isChasing = false;
-            movement.StopMoving();
-            stateMachine.ChangeState(walkState);
-        }
-
-        // 判断玩家是否在敌人的巡逻区域内
         public bool IsPlayerInsidePatrolArea()
         {
             if (player == null) return false;
@@ -146,25 +158,31 @@ namespace Enemy
             {
                 float minX = Mathf.Min(patrolPointA.position.x, patrolPointB.position.x);
                 float maxX = Mathf.Max(patrolPointA.position.x, patrolPointB.position.x);
-                float px = player.position.x;
-                return px >= minX && px <= maxX;
+                return player.position.x >= minX && player.position.x <= maxX;
             }
-            else
-            {
-                return Vector2.Distance(patrolCenter, player.position) <= patrolRange;
-            }
+
+            return Vector2.Distance(patrolCenter, player.position) <= patrolRange;
+        }
+
+        public bool IsPlayerOnChaseLine()
+        {
+            if (player == null) return false;
+
+            Vector2 delta = player.position - transform.position;
+            float verticalOffset = Mathf.Abs(delta.y - data.chaseYOffset);
+            if (verticalOffset > data.chaseHeight * 0.5f) return false;
+
+            float forwardSign = Mathf.Sign(movement.CurrentDirection.x); // ✅ 修正
+            if (Mathf.Abs(forwardSign) < 0.1f)
+                forwardSign = 1f;
+
+            if (delta.x * forwardSign < 0f) return false;
+            return Mathf.Abs(delta.x) <= data.chaseRange;
         }
 
         public bool IsPlayerInAttackRange()
         {
-            return Vector2.Distance(transform.position, player.position)
-                 <= data.attackRange;
-        }
-
-        public bool IsPlayerInSight()
-        {
-            return Vector2.Distance(transform.position, player.position)
-                 <= data.sightRange;
+            return Vector2.Distance(transform.position, player.position) <= data.attackRange;
         }
 
         public void TakeDamage(int amount)
@@ -173,12 +191,9 @@ namespace Enemy
             if (currentHealth <= 0)
                 Die();
             else
-            {
-                // 受击时也可以开启追击
-                if (player != null) StartChase();
-            }
+                StartCoroutine(DetectionRoutine());
         }
-        // 新增方法：切换到下一个 patrol 目标
+
         public void SwitchToNextPatrolTarget()
         {
             if (patrolPointA == null || patrolPointB == null) return;

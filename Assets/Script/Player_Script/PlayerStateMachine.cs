@@ -17,10 +17,12 @@ namespace Player
         public float groundCheckRadius = 0.1f;
         public LayerMask groundLayer;
 
-        [Header("Attack / Combo")]
-        public int maxCombo = 3;
-        public float comboWindow = 0.6f;
-        public float requiredChargeTime = 0.6f;
+        [Header("Attack")]
+        public float lightAttackTimeout = 0.35f;  // Attack1/2/3/Combo 攻击动画时长
+        public float heavyHoldTime = 0.5f;         // 长按 H 触发重击的时间
+        public float heavyCooldown = 2f;           // Heavy_Attack 冷却时间
+        public float comboWindow = 5f;             // 连击储存后有效窗口
+        [HideInInspector] public float activeAttackTimeout = 0.35f;  // 当前攻击的时长（进入 AttackState 前设置）
 
         public bool controlsEnabled = true;
         public float horizontal;
@@ -35,10 +37,12 @@ namespace Player
         public HitState hitState;
         public DeadState deadState;
 
-        private int comboStep = 0;
-        private float comboTimer = 0f;
-        private bool isChargingHeavy = false;
-        private float chargeTimer = 0f;
+        private float hKeyHoldTimer = 0f;           // H 键长按计时
+        private bool isHeavyCharging = false;       // 是否正在蓄力重击
+        private float heavyCooldownTimer = 0f;      // Heavy 冷却倒计时
+        private int attackSequence = 0;             // 0=无, 1=已完成Attack1, 2=已完成Attack2
+        private int comboStored = 0;                // 0=无, 1=连击已储存
+        private float comboStoreTimer = 0f;         // 连击储存倒计时
 
         private static readonly int ParamSpeed = Animator.StringToHash("Speed");
         private static readonly int ParamIsGrounded = Animator.StringToHash("IsGrounded");
@@ -86,40 +90,133 @@ namespace Player
             animator.SetFloat(ParamSpeed, Mathf.Abs(horizontal));
             animator.SetBool(ParamIsGrounded, isGrounded);
 
-            bool jumpPressed = Input.GetButtonDown("Jump");
-            bool attackPressed = Input.GetKeyDown(KeyCode.J);
-            bool attackReleased = Input.GetKeyUp(KeyCode.J);
-            bool shiftHeld = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            // ──── 计时器更新 ────
 
-            if (attackPressed && shiftHeld)
-            {
-                StartChargingHeavy();
-            }
-            else if (attackPressed)
-            {
-                HandleAttackInput();
-            }
+            if (heavyCooldownTimer > 0f)
+                heavyCooldownTimer -= Time.deltaTime;
 
-            if (isChargingHeavy)
+            if (comboStored > 0)
             {
-                chargeTimer += Time.deltaTime;
-                if (attackReleased)
-                    ReleaseHeavy();
-            }
-
-            if (comboStep > 0)
-            {
-                comboTimer -= Time.deltaTime;
-                if (comboTimer <= 0f)
+                comboStoreTimer -= Time.deltaTime;
+                if (comboStoreTimer <= 0f)
                 {
-                    comboStep = 0;
-                    animator.SetInteger(ParamAttackID, 0);
-                    if (isGrounded)
-                        ChangeState(idleState);
+                    comboStored = 0;        // 过期
+                    attackSequence = 0;
                 }
             }
 
-            if (currentState != attackState && currentState != hitState && currentState != deadState && currentState != jumpState)
+            // ──── 输入读取 ────
+
+            bool jumpPressed = Input.GetButtonDown("Jump");
+            bool jPressed = Input.GetKeyDown(KeyCode.J);
+            bool wHeld = Input.GetKey(KeyCode.W);
+            bool sHeld = Input.GetKey(KeyCode.S);
+            bool hHeld = Input.GetKey(KeyCode.H);
+
+            // ═══════════════════════════════════════
+            // 攻击输入处理
+            // ═══════════════════════════════════════
+
+            if (jPressed && currentState != deadState)
+            {
+                // J 按下时取消 H 蓄力
+                isHeavyCharging = false;
+                hKeyHoldTimer = 0f;
+
+                if (sHeld && !wHeld)
+                {
+                    // S+J → Attack3
+                    // 只有当序列为 2（完成 Attack1→Attack2）时，Attack3 才完成连击
+                    if (attackSequence == 2)
+                    {
+                        comboStored = 1;
+                        comboStoreTimer = comboWindow;
+                        attackSequence = 0;
+                    }
+                    else
+                    {
+                        attackSequence = 0;  // 序列断裂
+                    }
+                    activeAttackTimeout = lightAttackTimeout;
+                    animator.SetInteger(ParamAttackID, 3);
+                    ChangeState(attackState);
+                }
+                else if (wHeld && !sHeld)
+                {
+                    // W+J → Attack2
+                    if (attackSequence == 1)
+                        attackSequence = 2;  // 接上 Attack1 的序列
+                    else
+                        attackSequence = 0;  // 序列断裂
+                    activeAttackTimeout = lightAttackTimeout;
+                    animator.SetInteger(ParamAttackID, 2);
+                    ChangeState(attackState);
+                }
+                else
+                {
+                    // J → 如果有储存 Combo 则触发，否则 Attack1
+                    if (comboStored > 0)
+                    {
+                        // 触发 Combo！
+                        comboStored = 0;
+                        comboStoreTimer = 0f;
+                        attackSequence = 0;
+                        activeAttackTimeout = lightAttackTimeout;
+                        animator.SetInteger(ParamAttackID, 4);
+                        ChangeState(attackState);
+                    }
+                    else
+                    {
+                        // Attack1 — 开始新序列
+                        attackSequence = 1;
+                        activeAttackTimeout = lightAttackTimeout;
+                        animator.SetInteger(ParamAttackID, 1);
+                        ChangeState(attackState);
+                    }
+                }
+            }
+            // H 蓄力重击（冷却中或攻击中不可用）
+            else if (hHeld && heavyCooldownTimer <= 0f
+                     && currentState != attackState && currentState != deadState)
+            {
+                if (!isHeavyCharging)
+                {
+                    isHeavyCharging = true;
+                    hKeyHoldTimer = 0f;
+                }
+
+                hKeyHoldTimer += Time.deltaTime;
+
+                if (hKeyHoldTimer >= heavyHoldTime)
+                {
+                    isHeavyCharging = false;
+                    hKeyHoldTimer = 0f;
+
+                    // 启动冷却
+                    heavyCooldownTimer = heavyCooldown;
+                    activeAttackTimeout = heavyCooldown;
+                    // 重置序列（Heavy 打断连击累计）
+                    attackSequence = 0;
+                    comboStored = 0;
+                    comboStoreTimer = 0f;
+
+                    animator.SetTrigger(ParamHeavyAttack);
+                    ChangeState(attackState);
+                    StartCoroutine(DoSaveSwordRoutine());
+                }
+            }
+            else
+            {
+                isHeavyCharging = false;
+                hKeyHoldTimer = 0f;
+            }
+
+            // ═══════════════════════════════════════
+            // 移动 / 跳跃状态切换
+            // ═══════════════════════════════════════
+
+            if (currentState != attackState && currentState != hitState
+                && currentState != deadState && currentState != jumpState)
             {
                 if (jumpPressed && isGrounded)
                 {
@@ -146,7 +243,9 @@ namespace Player
 
             if (currentState != attackState && currentState != hitState && currentState != deadState && currentState != jumpState)
             {
-                rb.velocity = new Vector2(horizontal * moveSpeed, rb.velocity.y);
+                // H 蓄力期间禁止水平移动
+                float moveX = isHeavyCharging ? 0f : horizontal;
+                rb.velocity = new Vector2(moveX * moveSpeed, rb.velocity.y);
             }
 
             if (horizontal > 0.1f && transform.localScale.x < 0f)
@@ -173,59 +272,23 @@ namespace Player
                 ChangeState(idleState);
         }
 
+        // Animation event receiver: called at the end of attack animations
+        public void OnAttackAnimationEnd()
+        {
+            // Delegate to the existing finish handler so both PlayerController and PlayerStateMachine
+            // can receive the same AnimationEvent from the Animator.
+            AttackFinished();
+        }
+
+        // Animation event receiver: called at the end of heavy attack animation
+        public void OnHeavyAttackEnd()
+        {
+            if (isGrounded) ChangeState(idleState);
+        }
+
         public void SetJumpTrigger()
         {
             animator.SetTrigger(ParamJump);
-        }
-
-        private void HandleAttackInput()
-        {
-            if (currentState == deadState) return;
-            if (isChargingHeavy) return;
-
-            if (comboStep == 0)
-            {
-                comboStep = 1;
-                comboTimer = comboWindow;
-                animator.SetInteger(ParamAttackID, comboStep);
-                ChangeState(attackState);
-            }
-            else if (comboTimer > 0f)
-            {
-                comboStep = Mathf.Min(comboStep + 1, maxCombo);
-                comboTimer = comboWindow;
-                animator.SetInteger(ParamAttackID, comboStep);
-                ChangeState(attackState);
-            }
-        }
-
-        private void StartChargingHeavy()
-        {
-            if (currentState == deadState) return;
-            isChargingHeavy = true;
-            chargeTimer = 0f;
-            animator.SetBool(ParamIsDrawing, true);
-            ChangeState(attackState);
-        }
-
-        private void ReleaseHeavy()
-        {
-            if (!isChargingHeavy) return;
-            isChargingHeavy = false;
-            animator.SetBool(ParamIsDrawing, false);
-
-            if (chargeTimer >= requiredChargeTime)
-            {
-                animator.SetTrigger(ParamHeavyAttack);
-                ChangeState(attackState);
-                StartCoroutine(DoSaveSwordRoutine());
-            }
-            else
-            {
-                HandleAttackInput();
-            }
-
-            chargeTimer = 0f;
         }
 
         private System.Collections.IEnumerator DoSaveSwordRoutine()

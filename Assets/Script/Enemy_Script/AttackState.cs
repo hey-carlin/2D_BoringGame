@@ -30,7 +30,7 @@ namespace Enemy
 
             if (timer >= enemy.data.attackCooldown)
             {
-                stateMachine.ChangeState(enemy.walkState);
+                stateMachine.ChangeState(enemy.walkState); // ✅ 必须回 Walk
             }
         }
     }
