@@ -14,6 +14,7 @@ namespace Enemy
 
         public void ChangeState(EnemyState newState)
         {
+            if (currentState == newState) return;
             currentState?.OnExit();
             currentState = newState;
             currentState.OnEnter();
@@ -33,6 +34,11 @@ namespace Enemy
         public void OnFixedUpdate()
         {
             currentState?.OnFixedUpdate();
+        }
+
+        public EnemyState GetCurrentState()
+        {
+            return currentState;
         }
     }
 }

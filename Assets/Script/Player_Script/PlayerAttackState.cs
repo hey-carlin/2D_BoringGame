@@ -5,20 +5,20 @@ namespace Player
 {
     public class AttackState : PlayerState
     {
-        private float comboTimer = 0f;
+        private float timer = 0f;
 
         public AttackState(PlayerStateMachine sm) : base(sm) { }
 
         public override void OnEnter()
         {
-            comboTimer = sm.comboWindow;
+            timer = sm.activeAttackTimeout;
         }
 
         public override void OnUpdate()
         {
-            comboTimer -= Time.deltaTime;
+            timer -= Time.deltaTime;
 
-            if (comboTimer <= 0f)
+            if (timer <= 0f)
             {
                 sm.animator.SetInteger("AttackID", 0);
                 sm.AttackFinished();

@@ -15,6 +15,7 @@ public class CameraFollow : MonoBehaviour
     public float lookUpOffsetY = 2f;
     public float lookDownOffsetY = -2f;
     public float lookLerpSpeed = 8f;
+    public float lookHoldThreshold = 1f;      // 需要按住 W/S 超过此时间才触发偏移
 
     [Header("边界限制")]
     public bool enableBounds = false;
@@ -26,6 +27,7 @@ public class CameraFollow : MonoBehaviour
     // 内部变量
     private Vector3 currentExtraOffset;
     private Vector3 targetExtraOffset;
+    private float lookHoldTimer = 0f;                     // W/S 按住计时器
 
     private void Start()
     {
@@ -49,16 +51,32 @@ public class CameraFollow : MonoBehaviour
         bool pressDown = Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow);
         bool attackHeld = Input.GetKey(KeyCode.J);
 
-        bool allowLookByState = true;
-
+        // 检查玩家是否处于攻击状态
+        bool isAttacking = false;
         PlayerStateMachine psm = target.GetComponent<PlayerStateMachine>();
         if (psm != null)
         {
-            // 只在 Idle 状态下允许抬头 / 低头
-            allowLookByState = psm.currentState is IdleState;
+            isAttacking = psm.currentState is AttackState;
         }
 
-        if (!attackHeld && allowLookByState)
+        // 攻击优先级高于视角偏移：攻击期间或 J 键按下时重置计时器
+        if (attackHeld || isAttacking)
+        {
+            lookHoldTimer = 0f;
+        }
+        else if (pressUp || pressDown)
+        {
+            // W/S 被按住时累计计时
+            lookHoldTimer += Time.deltaTime;
+        }
+        else
+        {
+            // 没有按 W/S 时重置计时器
+            lookHoldTimer = 0f;
+        }
+
+        // 只有按住 W/S 超过阈值才触发视角偏移
+        if (lookHoldTimer >= lookHoldThreshold)
         {
             if (pressUp && !pressDown)
                 targetY = lookUpOffsetY;
