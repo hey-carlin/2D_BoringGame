@@ -1,4 +1,5 @@
 using UnityEngine;
+using DungeonKIT;
 
 namespace Player
 {
@@ -79,6 +80,17 @@ namespace Player
         void Update()
         {
             if (!controlsEnabled) return;
+
+            // 旧 UI 暂停/结束状态检查
+            if (UIManager.Instance != null && UIManager.Instance.isPause) return;
+            if (GameManager.Instance != null && !GameManager.Instance.isGame) return;
+
+            // Esc 暂停
+            if (Input.GetKeyDown(KeyCode.Escape) && UIManager.Instance != null)
+            {
+                UIManager.Instance.Pause();
+                return;
+            }
 
             horizontal = Input.GetAxisRaw("Horizontal");
             isGrounded = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer) != null;
