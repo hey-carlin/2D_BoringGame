@@ -2,40 +2,34 @@ using UnityEngine;
 
 namespace Enemy
 {
+    /// <summary>
+    /// 随机待机状态：停止移动，等待随机时长后切换回随机巡逻。
+    /// </summary>
     public class IdleState : EnemyState
     {
-        private float timer;
+        private float idleTimer;
+        private float idleDuration;
 
         public IdleState(EnemyController enemy, StateMachine stateMachine)
             : base(enemy, stateMachine) { }
 
         public override void OnEnter()
         {
-            timer = 0f;
+            // 随机待机时长
+            idleDuration = Random.Range(enemy.data.minIdleDuration, enemy.data.maxIdleDuration);
+            idleTimer = 0f;
+
             enemy.movement.StopMoving();
             enemy.animator.Play("Idle");
         }
 
         public override void OnUpdate()
         {
-            timer += Time.deltaTime;
+            idleTimer += Time.deltaTime;
 
-            // 检测玩家期间不处理巡逻逻辑
-            if (enemy.detectionInProgress)
-                return;
-
-            if (timer >= enemy.data.idleDuration)
+            // 待机超时 → 随机巡逻
+            if (idleTimer >= idleDuration)
             {
-                // 切换到下一个巡逻目标并立即翻转朝向
-                enemy.SwitchToNextPatrolTarget();
-                if (enemy.currentPatrolTarget != null)
-                {
-                    Vector2 dir = enemy.currentPatrolTarget.position - enemy.transform.position;
-                    dir.y = 0f;
-                    if (dir.sqrMagnitude > 0.0001f)
-                        enemy.movement.FaceDirection(dir, true);
-                }
-
                 stateMachine.ChangeState(enemy.walkState);
             }
         }

@@ -11,6 +11,7 @@ namespace Player
         [Header("Movement")]
         public float moveSpeed = 5f;
         public float jumpForce = 12f;
+        public int maxJumps = 2;                         // 最大跳跃次数，2 = 二连跳
 
         [Header("Ground Check")]
         public Transform groundCheck;
@@ -37,6 +38,7 @@ namespace Player
         public HitState hitState;
         public DeadState deadState;
 
+        private int jumpCount = 0;                  // 当前已跳跃次数，接地时重置
         private float hKeyHoldTimer = 0f;           // H 键长按计时
         private bool isHeavyCharging = false;       // 是否正在蓄力重击
         private float heavyCooldownTimer = 0f;      // Heavy 冷却倒计时
@@ -212,14 +214,19 @@ namespace Player
             }
 
             // ═══════════════════════════════════════
-            // 移动 / 跳跃状态切换
+            // 二连跳：接地重置，空中允许再跳一次
             // ═══════════════════════════════════════
 
+            if (isGrounded)
+                jumpCount = 0;
+
+            // 地面起跳（第一跳）
             if (currentState != attackState && currentState != hitState
                 && currentState != deadState && currentState != jumpState)
             {
                 if (jumpPressed && isGrounded)
                 {
+                    jumpCount++;
                     ChangeState(jumpState);
                 }
                 else if (Mathf.Abs(horizontal) > 0.1f)
@@ -230,6 +237,16 @@ namespace Player
                 {
                     ChangeState(idleState);
                 }
+            }
+
+            // 空中二连跳（不受 jumpState 限制）
+            if (jumpPressed && !isGrounded && jumpCount < maxJumps
+                && currentState != deadState
+                && currentState != attackState
+                && currentState != hitState)
+            {
+                jumpCount++;
+                ChangeState(jumpState);
             }
 
             currentState?.OnUpdate();

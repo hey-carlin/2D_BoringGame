@@ -1,7 +1,5 @@
 using UnityEngine;
 
-using UnityEngine;
-
 [CreateAssetMenu(fileName = "NewEnemyData", menuName = "Enemy/Enemy Data")]
 public class EnemyData : ScriptableObject
 {
@@ -14,6 +12,12 @@ public class EnemyData : ScriptableObject
     public float idleDuration = 2f;
     public float alertDuration = 0.5f;
     public float walkDuration = 3f;
+
+    [Header("随机巡逻")]
+    public float minWalkDuration = 4f;      // 随机行走最短时长（越大巡逻范围越广）
+    public float maxWalkDuration = 8f;      // 随机行走最长时长
+    public float minIdleDuration = 0.5f;    // 随机待机最短时长
+    public float maxIdleDuration = 1.5f;    // 随机待机最长时长
 
     [Header("攻击")]
     public int damage = 10;

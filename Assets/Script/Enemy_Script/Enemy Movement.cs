@@ -67,13 +67,24 @@ namespace Enemy
         }
         #endregion
 
-        #region 转向（2D 横版唯一正确方式）
+        #region 转向
+        private int facingDirection = 1; // 1=右, -1=左, 用于检测方向反转
+
         public void FaceDirection(Vector2 direction, bool immediate = false)
         {
             if (graphics == null || direction.sqrMagnitude < 0.0001f)
                 return;
 
             bool faceRight = direction.x >= 0f;
+            int newFacing = faceRight ? 1 : -1;
+
+            // 方向反转时立即翻转，避免 Lerp 造成的抽搐
+            if (newFacing != facingDirection)
+            {
+                facingDirection = newFacing;
+                immediate = true;
+            }
+
             float targetX = baseScaleX * (faceRight ? 1f : -1f);
 
             Vector3 s = graphics.localScale;
@@ -83,7 +94,7 @@ namespace Enemy
             }
             else
             {
-                s.x = Mathf.Lerp(s.x, targetX, facingLerpSpeed * Time.deltaTime);
+                s.x = Mathf.MoveTowards(s.x, targetX, facingLerpSpeed * Time.deltaTime);
             }
 
             graphics.localScale = s;
@@ -107,21 +118,71 @@ namespace Enemy
         }
         #endregion
 
-        #region 检测
+        #region 检测参数
+        [Header("墙体检测线")]
+        public float wallCheckDistance = 0.6f;           // 墙体检测线长度（水平向前）
+        public LayerMask wallLayer = ~0;                  // 墙体层级
+
+        [Header("地面/悬崖检测线")]
+        public float groundCheckAhead = 0.6f;             // 检测起点前移距离
+        public float groundCheckDown = 1.2f;              // 向下检测深度
+        public LayerMask groundLayer = ~0;                 // 地面层级
+
+        [Header("调试")]
+        public bool showDetectionGizmos = true;
+        #endregion
+
+        #region 检测方法
+        /// <summary>墙体检测线：前方水平射线，触碰墙体返回 true</summary>
         public bool IsBlocked()
         {
-            if (currentDirection == Vector2.zero) return false;
-            return Physics2D.Raycast(transform.position, currentDirection, 0.5f, LayerMask.GetMask("Obstacle"));
+            if (currentDirection.sqrMagnitude < 0.0001f) return false;
+            RaycastHit2D hit = Physics2D.Raycast(transform.position, currentDirection, wallCheckDistance, wallLayer);
+            return hit.collider != null;
         }
 
-        public bool IsGroundAhead(Vector2 direction, float distance, float verticalOffset)
+        /// <summary>地面/悬崖检测线：前方往下射线，检测不到地面返回 false（前方是悬崖）</summary>
+        public bool IsGroundAhead()
         {
-            Vector2 origin = (Vector2)transform.position +
-                            direction.normalized * distance +
-                            Vector2.up * verticalOffset;
+            Vector2 dir = currentDirection.sqrMagnitude > 0.0001f
+                ? currentDirection.normalized
+                : Vector2.right;
 
-            return Physics2D.Raycast(origin, Vector2.down, verticalOffset + 0.1f, LayerMask.GetMask("Ground"));
+            Vector2 origin = (Vector2)transform.position + dir * groundCheckAhead;
+            RaycastHit2D hit = Physics2D.Raycast(origin, Vector2.down, groundCheckDown, groundLayer);
+            return hit.collider != null;
         }
+
+        /// <summary>综合检测：前方是否有墙体或悬崖</summary>
+        public bool IsPathBlocked()
+        {
+            return IsBlocked() || !IsGroundAhead();
+        }
+        #endregion
+
+        #region 编辑器 Gizmos
+#if UNITY_EDITOR
+        void OnDrawGizmosSelected()
+        {
+            if (!showDetectionGizmos) return;
+
+            Vector2 pos = transform.position;
+            Vector2 dir = Application.isPlaying && currentDirection.sqrMagnitude > 0.0001f
+                ? currentDirection.normalized
+                : Vector2.right;
+
+            // ── 墙体检测线（黄色）──
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawLine(pos, pos + dir * wallCheckDistance);
+            Gizmos.DrawWireSphere(pos + dir * wallCheckDistance, 0.05f);
+
+            // ── 地面检测线（绿色，前方往下）──
+            Gizmos.color = Color.green;
+            Vector2 groundOrigin = pos + dir * groundCheckAhead;
+            Gizmos.DrawLine(groundOrigin, groundOrigin + Vector2.down * groundCheckDown);
+            Gizmos.DrawWireSphere(groundOrigin + Vector2.down * groundCheckDown, 0.05f);
+        }
+#endif
         #endregion
     }
 }
