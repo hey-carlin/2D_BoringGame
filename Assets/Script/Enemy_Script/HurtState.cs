@@ -26,8 +26,8 @@ namespace Enemy
 
             enemy.movement.StopMoving();
 
-            // 动画
-            enemy.animator.Play("Idle"); // 没有 Hurt 动画则用 Idle
+            // 播放受击动画
+            enemy.animator.SetTrigger("Hit");
 
             // 闪烁缓存
             spriteRenderer = enemy.GetComponentInChildren<SpriteRenderer>();
