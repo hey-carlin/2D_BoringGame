@@ -11,7 +11,7 @@ TagManager:
   - Border
   - Water
   - UI
-  - groundLayer
+  - Ground
   - Enemy Layer
   - PlayerLayer
   - 
@@ -53,7 +53,7 @@ TagManager:
   - name: Trap
     uniqueID: 2962840479
     locked: 0
-  - name: Floor
+  - name: Ground
     uniqueID: 610816259
     locked: 0
   - name: ForBg

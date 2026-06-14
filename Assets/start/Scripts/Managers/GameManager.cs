@@ -23,7 +23,11 @@ namespace DungeonKIT
         private void Start()
         {
             //Find next level door
-            nextLevelDoor = GameObject.Find("NextLevelDoor").GetComponent<NextLevelDoor>();
+            GameObject doorObj = GameObject.Find("NextLevelDoor");
+            if (doorObj != null)
+            {
+                nextLevelDoor = doorObj.GetComponent<NextLevelDoor>();
+            }
         }
 
         //GameOver method
@@ -37,8 +41,11 @@ namespace DungeonKIT
         public void LevelComplete()
         {
             levelComplete = true; //Set bool for Check door status
-            nextLevelDoor.lockedDoor = false; //Unlock door
-            nextLevelDoor.CheckLockStatus(); //Check door status
+            if (nextLevelDoor != null)
+            {
+                nextLevelDoor.lockedDoor = false; //Unlock door
+                nextLevelDoor.CheckLockStatus(); //Check door status
+            }
         }
     }
 }

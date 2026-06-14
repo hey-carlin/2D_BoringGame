@@ -8,30 +8,54 @@ namespace Player
         [Header("Components")]
         public Animator animator;
         public Rigidbody2D rb;
+        public PlayerMeleeAttack meleeAttack;
 
         [Header("Movement")]
-        public float moveSpeed = 5f;
-        public float jumpForce = 12f;
-        public int maxJumps = 2;                         // 最大跳跃次数，2 = 二连跳
+        public float moveSpeed = 6f;
+        public float acceleration = 40f;
+        public float deceleration = 35f;
+        public float airAcceleration = 18f;
+        public float airDeceleration = 12f;
+
+        [Header("Jump")]
+        public float jumpForce = 14f;
+        public int maxJumps = 2;                          // 最大跳跃次数（接地补满）
+        public float jumpBufferTime = 0.12f;              // 跳跃输入缓冲窗口
 
         [Header("Ground Check")]
         public Transform groundCheck;
-        public float groundCheckRadius = 0.1f;
+        public float groundCheckRadius = 0.15f;
         public LayerMask groundLayer;
 
         [Header("Attack")]
-        public float lightAttackTimeout = 0.35f;  // Attack1/2/3/Combo 攻击动画时长
-        public float heavyHoldTime = 0.5f;         // 长按 H 触发重击的时间
-        public float heavyCooldown = 2f;           // Heavy_Attack 冷却时间
-        public float comboWindow = 5f;             // 连击储存后有效窗口
-        [HideInInspector] public float activeAttackTimeout = 0.35f;  // 当前攻击的时长（进入 AttackState 前设置）
+        public int lightAttackDamage = 3;
+        public int heavyAttackDamage = 5;
+        public float lightAttackDuration = 0.35f;
+        public float heavyAttackDuration = 0.8f;
+        public float heavyHoldTime = 0.4f;
+        public float heavyCooldown = 2f;
+        public float comboWindow = 3f;
+        public float attackForwardStep = 2.5f;
 
-        public bool controlsEnabled = true;
-        public float horizontal;
-        public bool isGrounded;
+        [Header("Damage")]
+        public float invincibilityDuration = 1.2f;
+        public float hitKnockbackForce = 6f;
+
+        [Header("Debug")]
+        public bool showDebugInfo = false;
+
+        // ──── 运行时状态 ────
+        [HideInInspector] public bool controlsEnabled = true;
+        [HideInInspector] public float horizontal;
+        [HideInInspector] public bool isGrounded;
+        [HideInInspector] public bool isInvincible;
+        [HideInInspector] public float activeAttackDuration = 0.35f;
+        [HideInInspector] public float currentMoveSpeed;
+        [HideInInspector] public float invincibilityTimer;
+        [HideInInspector] public int remainingJumps;
+        [HideInInspector] public float jumpBufferTimer;
 
         public PlayerState currentState;
-
         public IdleState idleState;
         public RunState runState;
         public JumpState jumpState;
@@ -39,13 +63,13 @@ namespace Player
         public HitState hitState;
         public DeadState deadState;
 
-        private int jumpCount = 0;                  // 当前已跳跃次数，接地时重置
-        private float hKeyHoldTimer = 0f;           // H 键长按计时
-        private bool isHeavyCharging = false;       // 是否正在蓄力重击
-        private float heavyCooldownTimer = 0f;      // Heavy 冷却倒计时
-        private int attackSequence = 0;             // 0=无, 1=已完成Attack1, 2=已完成Attack2
-        private int comboStored = 0;                // 0=无, 1=连击已储存
-        private float comboStoreTimer = 0f;         // 连击储存倒计时
+        // ──── 内部 ────
+        private float hKeyHoldTimer;
+        private bool isHeavyCharging;
+        private float heavyCooldownTimer;
+        private int attackSequence;
+        private int comboStored;
+        private float comboStoreTimer;
 
         private static readonly int ParamSpeed = Animator.StringToHash("Speed");
         private static readonly int ParamIsGrounded = Animator.StringToHash("IsGrounded");
@@ -67,6 +91,7 @@ namespace Player
         {
             if (rb == null) rb = GetComponent<Rigidbody2D>();
             if (animator == null) animator = GetComponent<Animator>();
+            if (meleeAttack == null) meleeAttack = GetComponent<PlayerMeleeAttack>();
 
             idleState = new IdleState(this);
             runState = new RunState(this);
@@ -78,8 +103,9 @@ namespace Player
 
         void Start()
         {
-            if (rb == null) rb = GetComponent<Rigidbody2D>();
-            if (animator == null) animator = GetComponent<Animator>();
+            controlsEnabled = true;
+            isInvincible = false;
+            remainingJumps = maxJumps;
             ChangeState(idleState);
         }
 
@@ -87,25 +113,44 @@ namespace Player
         {
             if (!controlsEnabled) return;
 
-            // 旧 UI 暂停/结束状态检查
             if (UIManager.Instance != null && UIManager.Instance.isPause) return;
             if (GameManager.Instance != null && !GameManager.Instance.isGame) return;
 
-            // Esc 暂停
             if (Input.GetKeyDown(KeyCode.Escape) && UIManager.Instance != null)
             {
                 UIManager.Instance.Pause();
                 return;
             }
 
+            // ──── 输入 ────
             horizontal = Input.GetAxisRaw("Horizontal");
-            isGrounded = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer) != null;
+            bool jumpPressed = Input.GetButtonDown("Jump");
+            bool jPressed = Input.GetKeyDown(KeyCode.J);
+            bool wHeld = Input.GetKey(KeyCode.W);
+            bool sHeld = Input.GetKey(KeyCode.S);
+            bool hHeld = Input.GetKey(KeyCode.H);
 
-            animator.SetFloat(ParamSpeed, Mathf.Abs(horizontal));
+            // ──── 地面检测（仅 groundLayer）───
+            if (groundCheck != null)
+                isGrounded = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer) != null;
+            else
+                isGrounded = false;
+
+            // ──── 跳跃缓冲 ────
+            if (jumpPressed)
+                jumpBufferTimer = jumpBufferTime;
+            else
+                jumpBufferTimer -= Time.deltaTime;
+
+            // ──── 接地补满跳跃次数 ────
+            if (isGrounded)
+                remainingJumps = maxJumps;
+
+            // ──── 动画参数 ────
+            animator.SetFloat(ParamSpeed, Mathf.Abs(currentMoveSpeed) / moveSpeed);
             animator.SetBool(ParamIsGrounded, isGrounded);
 
-            // ──── 计时器更新 ────
-
+            // ──── 计时器 ────
             if (heavyCooldownTimer > 0f)
                 heavyCooldownTimer -= Time.deltaTime;
 
@@ -114,106 +159,71 @@ namespace Player
                 comboStoreTimer -= Time.deltaTime;
                 if (comboStoreTimer <= 0f)
                 {
-                    comboStored = 0;        // 过期
+                    comboStored = 0;
                     attackSequence = 0;
                 }
             }
 
-            // ──── 输入读取 ────
-
-            bool jumpPressed = Input.GetButtonDown("Jump");
-            bool jPressed = Input.GetKeyDown(KeyCode.J);
-            bool wHeld = Input.GetKey(KeyCode.W);
-            bool sHeld = Input.GetKey(KeyCode.S);
-            bool hHeld = Input.GetKey(KeyCode.H);
-
             // ═══════════════════════════════════════
-            // 攻击输入处理
+            // 攻击输入
             // ═══════════════════════════════════════
 
             if (jPressed && currentState != deadState)
             {
-                // J 按下时取消 H 蓄力
                 isHeavyCharging = false;
                 hKeyHoldTimer = 0f;
 
                 if (sHeld && !wHeld)
                 {
-                    // S+J → Attack3
-                    // 只有当序列为 2（完成 Attack1→Attack2）时，Attack3 才完成连击
-                    if (attackSequence == 2)
-                    {
-                        comboStored = 1;
-                        comboStoreTimer = comboWindow;
-                        attackSequence = 0;
-                    }
-                    else
-                    {
-                        attackSequence = 0;  // 序列断裂
-                    }
-                    activeAttackTimeout = lightAttackTimeout;
+                    if (attackSequence == 2) { comboStored = 1; comboStoreTimer = comboWindow; attackSequence = 0; }
+                    else attackSequence = 0;
+                    activeAttackDuration = lightAttackDuration;
+                    if (meleeAttack != null) meleeAttack.SetPendingDamage(lightAttackDamage);
                     animator.SetInteger(ParamAttackID, 3);
                     ChangeState(attackState);
                 }
                 else if (wHeld && !sHeld)
                 {
-                    // W+J → Attack2
-                    if (attackSequence == 1)
-                        attackSequence = 2;  // 接上 Attack1 的序列
-                    else
-                        attackSequence = 0;  // 序列断裂
-                    activeAttackTimeout = lightAttackTimeout;
+                    if (attackSequence == 1) attackSequence = 2;
+                    else attackSequence = 0;
+                    activeAttackDuration = lightAttackDuration;
+                    if (meleeAttack != null) meleeAttack.SetPendingDamage(lightAttackDamage);
                     animator.SetInteger(ParamAttackID, 2);
                     ChangeState(attackState);
                 }
                 else
                 {
-                    // J → 如果有储存 Combo 则触发，否则 Attack1
                     if (comboStored > 0)
                     {
-                        // 触发 Combo！
-                        comboStored = 0;
-                        comboStoreTimer = 0f;
-                        attackSequence = 0;
-                        activeAttackTimeout = lightAttackTimeout;
+                        comboStored = 0; comboStoreTimer = 0f; attackSequence = 0;
+                        activeAttackDuration = lightAttackDuration;
+                        if (meleeAttack != null) meleeAttack.SetPendingDamage(lightAttackDamage);
                         animator.SetInteger(ParamAttackID, 4);
                         ChangeState(attackState);
                     }
                     else
                     {
-                        // Attack1 — 开始新序列
                         attackSequence = 1;
-                        activeAttackTimeout = lightAttackTimeout;
+                        activeAttackDuration = lightAttackDuration;
+                        if (meleeAttack != null) meleeAttack.SetPendingDamage(lightAttackDamage);
                         animator.SetInteger(ParamAttackID, 1);
                         ChangeState(attackState);
                     }
                 }
             }
-            // H 蓄力重击（冷却中或攻击中不可用）
             else if (hHeld && heavyCooldownTimer <= 0f
                      && currentState != attackState && currentState != deadState)
             {
-                if (!isHeavyCharging)
-                {
-                    isHeavyCharging = true;
-                    hKeyHoldTimer = 0f;
-                }
-
+                if (!isHeavyCharging) { isHeavyCharging = true; hKeyHoldTimer = 0f; }
                 hKeyHoldTimer += Time.deltaTime;
 
                 if (hKeyHoldTimer >= heavyHoldTime)
                 {
-                    isHeavyCharging = false;
-                    hKeyHoldTimer = 0f;
-
-                    // 启动冷却
+                    isHeavyCharging = false; hKeyHoldTimer = 0f;
                     heavyCooldownTimer = heavyCooldown;
-                    activeAttackTimeout = heavyCooldown;
-                    // 重置序列（Heavy 打断连击累计）
-                    attackSequence = 0;
-                    comboStored = 0;
-                    comboStoreTimer = 0f;
-
+                    activeAttackDuration = heavyAttackDuration;
+                    attackSequence = 0; comboStored = 0; comboStoreTimer = 0f;
+                    if (meleeAttack != null) meleeAttack.SetPendingDamage(heavyAttackDamage);
                     animator.SetTrigger(ParamHeavyAttack);
                     ChangeState(attackState);
                     StartCoroutine(DoSaveSwordRoutine());
@@ -226,39 +236,29 @@ namespace Player
             }
 
             // ═══════════════════════════════════════
-            // 二连跳：接地重置，空中允许再跳一次
+            // 跳跃：接地补满次数，每次起跳消耗1次，空中二段跳由 JumpState 内部处理
             // ═══════════════════════════════════════
 
-            if (isGrounded)
-                jumpCount = 0;
+            bool wantsJump = jumpBufferTimer > 0f;
+            bool canJump = remainingJumps > 0
+                        && currentState != attackState
+                        && currentState != hitState
+                        && currentState != deadState
+                        && currentState != jumpState;
 
-            // 地面起跳（第一跳）
-            if (currentState != attackState && currentState != hitState
-                && currentState != deadState && currentState != jumpState)
+            if (wantsJump && canJump)
             {
-                if (jumpPressed && isGrounded)
-                {
-                    jumpCount++;
-                    ChangeState(jumpState);
-                }
-                else if (Mathf.Abs(horizontal) > 0.1f)
-                {
-                    ChangeState(runState);
-                }
-                else
-                {
-                    ChangeState(idleState);
-                }
-            }
-
-            // 空中二连跳（不受 jumpState 限制）
-            if (jumpPressed && !isGrounded && jumpCount < maxJumps
-                && currentState != deadState
-                && currentState != attackState
-                && currentState != hitState)
-            {
-                jumpCount++;
+                jumpBufferTimer = 0f;
                 ChangeState(jumpState);
+            }
+            // 地面移动（非特殊状态下）
+            else if (currentState != attackState && currentState != hitState
+                     && currentState != deadState && currentState != jumpState)
+            {
+                if (Mathf.Abs(horizontal) > 0.1f)
+                    ChangeState(runState);
+                else if (currentState == runState)
+                    ChangeState(idleState);
             }
 
             currentState?.OnUpdate();
@@ -268,57 +268,73 @@ namespace Player
         {
             if (!controlsEnabled) return;
 
-            currentState?.OnFixedUpdate();
-
-            if (currentState != attackState && currentState != hitState && currentState != deadState && currentState != jumpState)
+            // ──── 无敌倒计时 ────
+            if (isInvincible)
             {
-                // H 蓄力期间禁止水平移动
-                float moveX = isHeavyCharging ? 0f : horizontal;
-                rb.velocity = new Vector2(moveX * moveSpeed, rb.velocity.y);
+                invincibilityTimer -= Time.fixedDeltaTime;
+                if (invincibilityTimer <= 0f)
+                {
+                    isInvincible = false;
+                    invincibilityTimer = 0f;
+                }
             }
 
+            currentState?.OnFixedUpdate();
+
+            // ──── 翻转 ────
             if (horizontal > 0.1f && transform.localScale.x < 0f)
                 Flip();
             else if (horizontal < -0.1f && transform.localScale.x > 0f)
                 Flip();
         }
 
+        // ──── 公共接口 ────
+
         public void OnHit()
         {
+            if (isInvincible) return;
             ChangeState(hitState);
         }
 
         public void Die()
         {
             controlsEnabled = false;
+            isInvincible = true;
             ChangeState(deadState);
             animator.SetTrigger(ParamDeath);
         }
 
         public void AttackFinished()
         {
-            if (isGrounded)
-                ChangeState(idleState);
+            // 攻击结束直接切到 Idle，不检查 isGrounded
+            // （空中攻击结束后也能正常降落，移动块会在下一帧接管）
+            ChangeState(idleState);
         }
 
-        // Animation event receiver: called at the end of attack animations
+        // ──── Animation Events ────
+
+        public void OnAttackHitFrame()
+        {
+            if (meleeAttack != null)
+                meleeAttack.OnAttackHitFrame();
+        }
+
         public void OnAttackAnimationEnd()
         {
-            // Delegate to the existing finish handler so both PlayerController and PlayerStateMachine
-            // can receive the same AnimationEvent from the Animator.
             AttackFinished();
         }
 
-        // Animation event receiver: called at the end of heavy attack animation
         public void OnHeavyAttackEnd()
         {
-            if (isGrounded) ChangeState(idleState);
+            ChangeState(idleState);
         }
 
         public void SetJumpTrigger()
         {
             animator.SetTrigger(ParamJump);
         }
+
+        // ──── 内部 ────
 
         private System.Collections.IEnumerator DoSaveSwordRoutine()
         {
@@ -336,9 +352,31 @@ namespace Player
 
         public void ChangeState(PlayerState newState)
         {
+            if (currentState == newState) return;
             currentState?.OnExit();
             currentState = newState;
             currentState?.OnEnter();
         }
+
+        public int FacingDirection()
+        {
+            return transform.localScale.x >= 0f ? 1 : -1;
+        }
+
+#if UNITY_EDITOR
+        void OnGUI()
+        {
+            if (!showDebugInfo) return;
+            GUILayout.BeginArea(new Rect(10, 10, 260, 250));
+            GUILayout.Label($"State: {currentState?.GetType().Name}");
+            GUILayout.Label($"Grounded: {isGrounded}");
+            GUILayout.Label($"Velocity: {rb?.velocity}");
+            GUILayout.Label($"CurrentSpeed: {currentMoveSpeed:F2}");
+            GUILayout.Label($"Invincible: {isInvincible}");
+            GUILayout.Label($"Jumps Left: {remainingJumps}");
+            GUILayout.Label($"Buffer: {jumpBufferTimer:F3}");
+            GUILayout.EndArea();
+        }
+#endif
     }
 }

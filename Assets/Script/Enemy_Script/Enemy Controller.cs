@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Enemy
 {
-    public class EnemyController : MonoBehaviour
+    public class EnemyController : MonoBehaviour, IDamageable
     {
         [Header("Data")]
         public EnemyData data;
@@ -16,14 +16,24 @@ namespace Enemy
         [HideInInspector] public int currentHealth;
 
         // ── 状态实例 ──
-        public IdleState idleState;
         public WalkState walkState;
         public ChaseState chaseState;
         public AttackState attackState;
+        public HurtState hurtState;
         public DeadState deadState;
 
         private StateMachine stateMachine;
-        internal int patrolFacing = 1;                   // 巡逻朝向（1=右, -1=左），保证跨状态方向一致
+        internal int patrolFacing = 1;
+
+        // ── 内部计时 / 标记 ──
+        private float attackCooldownTimer;          // 攻击冷却倒计时
+        private float alertTimer;                  // 发现玩家后的"！"停顿
+        private bool isAlerted;                    // 是否已进入警觉
+        private Vector3 spawnPosition;             // 初始生成位置（用于重生）
+
+        // ── 事件 ──
+        public System.Action<int> OnDamaged;
+        public System.Action OnDied;
 
         void Awake()
         {
@@ -36,21 +46,22 @@ namespace Enemy
 
             stateMachine = new StateMachine();
 
-            idleState = new IdleState(this, stateMachine);
-            walkState = new WalkState(this, stateMachine);
-            chaseState = new ChaseState(this, stateMachine);
+            walkState   = new WalkState(this, stateMachine);
+            chaseState  = new ChaseState(this, stateMachine);
             attackState = new AttackState(this, stateMachine);
-            deadState = new DeadState(this, stateMachine);
+            hurtState   = new HurtState(this, stateMachine);
+            deadState   = new DeadState(this, stateMachine);
 
-            stateMachine.AddState(idleState);
             stateMachine.AddState(walkState);
             stateMachine.AddState(chaseState);
             stateMachine.AddState(attackState);
+            stateMachine.AddState(hurtState);
             stateMachine.AddState(deadState);
         }
 
         void Start()
         {
+            spawnPosition = transform.position;   // 记录初始位置
             InitFromData();
             stateMachine.ChangeState(walkState);
         }
@@ -60,23 +71,55 @@ namespace Enemy
             if (player == null) return;
 
             var cur = stateMachine.GetCurrentState();
+            if (cur == deadState || cur == hurtState) return;
+
+            // ── 计时器 ──
+            if (attackCooldownTimer > 0f)
+                attackCooldownTimer -= Time.deltaTime;
+
+            if (alertTimer > 0f)
+                alertTimer -= Time.deltaTime;
+
+            float dist = DistanceToPlayer();
+
+            // 超出脱战范围 → 重置警觉
+            if (dist > data.loseAggroRadius)
+                isAlerted = false;
+
+            // Alert 停顿期间暂停状态切换（但计时器继续走）
+            if (alertTimer > 0f)
+                return;
 
             // ═══════════════════════════════════════
-            // 根据玩家距离自动切换状态
+            // 状态切换（优先级从高到低）
             // ═══════════════════════════════════════
 
-            // 1. 攻击范围内 → 攻击（最高优先级）
-            if (IsPlayerInAttackRange() && cur != attackState && cur != deadState)
+            // 1. 攻击：在攻击范围内 + 冷却完毕
+            if (dist <= data.attackRange && attackCooldownTimer <= 0f
+                && cur != attackState)
             {
+                attackCooldownTimer = data.attackCooldown;
                 stateMachine.ChangeState(attackState);
             }
-            // 2. 玩家在追击检测线上 → 追击
-            else if (IsPlayerOnChaseLine() && cur != attackState && cur != deadState && cur != chaseState)
+            // 2. 追击：在索敌范围内
+            else if (dist <= data.aggroRadius
+                     && cur != attackState && cur != chaseState)
             {
-                stateMachine.ChangeState(chaseState);
+                // 首次发现 → Alert 停顿
+                if (!isAlerted && dist > data.attackRange)
+                {
+                    isAlerted = true;
+                    alertTimer = data.alertDuration;
+                    movement.StopMoving();
+                    animator.Play("Idle");
+                }
+                else
+                {
+                    stateMachine.ChangeState(chaseState);
+                }
             }
-            // 3. 玩家离开检测线 → 恢复随机巡逻
-            else if (!IsPlayerOnChaseLine() && cur == chaseState)
+            // 3. 脱战：超出索敌 + 正在追击 → 回巡逻
+            else if (dist > data.aggroRadius && cur == chaseState)
             {
                 stateMachine.ChangeState(walkState);
             }
@@ -94,53 +137,100 @@ namespace Enemy
         private void InitFromData()
         {
             currentHealth = data.maxHealth;
-            movement.Init(data.moveSpeed, data.chaseRange);
-            attack.Init(data.damage, data.attackRange);
+            movement.Init(data.moveSpeed, data.chaseSpeed);
+            attack.Init(data.damage, data.attackRange, data.attackWindup);
         }
 
-        // ──────────────────────── 检测方法 ────────────────────────
+        // ──────────────────────── 检测 ────────────────────────
 
-        /// <summary>玩家是否在攻击范围内</summary>
+        public float DistanceToPlayer()
+        {
+            if (player == null) return float.MaxValue;
+            return Vector2.Distance(transform.position, player.position);
+        }
+
         public bool IsPlayerInAttackRange()
         {
-            if (player == null) return false;
-            return Vector2.Distance(transform.position, player.position) <= data.attackRange;
+            return DistanceToPlayer() <= data.attackRange;
         }
 
-        /// <summary>玩家是否在追击检测线上（前方扇形区域）</summary>
-        public bool IsPlayerOnChaseLine()
+        public bool IsPlayerInAggroRange()
         {
-            if (player == null) return false;
-
-            Vector2 delta = player.position - transform.position;
-
-            // 垂直方向容差
-            float verticalOffset = Mathf.Abs(delta.y - data.chaseYOffset);
-            if (verticalOffset > data.chaseHeight * 0.5f) return false;
-
-            // 必须在敌人前方
-            float forwardSign = Mathf.Sign(movement.CurrentDirection.x);
-            if (Mathf.Abs(forwardSign) < 0.1f)
-                forwardSign = 1f;
-
-            if (delta.x * forwardSign < 0f) return false;
-
-            // 水平距离在追击范围内
-            return Mathf.Abs(delta.x) <= data.chaseRange;
+            return DistanceToPlayer() <= data.aggroRadius;
         }
 
-        // ──────────────────────── 伤害 / 死亡 ────────────────────────
+        // ──────────────────────── IDamageable ────────────────────────
 
         public void TakeDamage(int amount)
         {
+            if (stateMachine.GetCurrentState() == deadState) return;
+
             currentHealth -= amount;
+            OnDamaged?.Invoke(currentHealth);
+
+            // 被打中时进入警觉
+            isAlerted = true;
+
+            // 转向攻击者方向
+            if (player != null)
+            {
+                Vector2 toPlayer = player.position - transform.position;
+                if (Mathf.Abs(toPlayer.x) > 0.01f)
+                    movement.FaceDirection(new Vector2(Mathf.Sign(toPlayer.x), 0f), true);
+            }
+
             if (currentHealth <= 0)
                 Die();
+            else
+                stateMachine.ChangeState(hurtState);
         }
 
         public void Die()
         {
+            OnDied?.Invoke();
             stateMachine.ChangeState(deadState);
+            StartCoroutine(RespawnRoutine());
+        }
+
+        /// <summary>死亡后等待 → 原地重生</summary>
+        private System.Collections.IEnumerator RespawnRoutine()
+        {
+            // 等待死亡动画 + 渐隐完成
+            yield return new WaitForSeconds(data.deathDestroyDelay + 0.3f);
+
+            // 隐藏（GameObject 不关，只是看不到）
+            var sr = GetComponentInChildren<SpriteRenderer>();
+            if (sr != null) sr.enabled = false;
+            foreach (var col in GetComponentsInChildren<Collider2D>())
+                col.enabled = false;
+
+            movement.StopMoving();
+
+            // 等待重生时间
+            yield return new WaitForSeconds(data.respawnDelay);
+
+            // ── 重生 ──
+            transform.position = spawnPosition;
+            currentHealth = data.maxHealth;
+            isAlerted = false;
+            alertTimer = 0f;
+            attackCooldownTimer = 0f;
+            patrolFacing = 1;
+
+            // 恢复渲染和碰撞
+            if (sr != null) sr.enabled = true;
+            foreach (var col in GetComponentsInChildren<Collider2D>())
+                col.enabled = true;
+
+            // 重置 Rigidbody2D
+            var rb = GetComponent<Rigidbody2D>();
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+                rb.simulated = true;
+            }
+
+            stateMachine.ChangeState(walkState);
         }
     }
 }

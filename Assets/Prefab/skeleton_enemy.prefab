@@ -31,56 +31,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 4920632344821208016}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &5146371506360741436
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2464816228249890343}
-  - component: {fileID: 8227885146927657605}
-  m_Layer: 7
-  m_Name: GroundCheck
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &2464816228249890343
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5146371506360741436}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.678, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 4920632344821208016}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &8227885146927657605
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5146371506360741436}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ff4dc4bb8a275d74c9adbfc692e8f3bb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  rayOffset: {x: 0, y: -0.5}
-  rayLength: 0.2
-  groundLayer:
-    serializedVersion: 2
-    m_Bits: 64
-  drawDebug: 1
 --- !u!1 &9199147924679585449
 GameObject:
   m_ObjectHideFlags: 0
@@ -118,7 +68,6 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4191395561132310402}
-  - {fileID: 2464816228249890343}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &3982915893238870400
@@ -274,9 +223,6 @@ MonoBehaviour:
   attack: {fileID: 8457868460699556491}
   player: {fileID: 0}
   currentHealth: 0
-  patrolPointA: {fileID: 0}
-  patrolPointB: {fileID: 0}
-  groundChecker: {fileID: 8227885146927657605}
 --- !u!114 &9161443227757286159
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -291,6 +237,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   graphics: {fileID: 0}
   facingLerpSpeed: 12
+  wallCheckDistance: 0.6
+  wallLayer:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  groundCheckDown: 1.2
+  groundCheckAhead: 0.6
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  showDetectionGizmos: 1
 --- !u!114 &8457868460699556491
 MonoBehaviour:
   m_ObjectHideFlags: 0

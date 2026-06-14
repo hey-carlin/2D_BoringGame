@@ -14,10 +14,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   moveSpeed: 2
   sightRange: 5
+  chaseRange: 8
+  chaseHeight: 2
+  chaseYOffset: 0
   idleDuration: 2
+  alertDuration: 0.5
   walkDuration: 3
-  damage: 10
+  minWalkDuration: 4
+  maxWalkDuration: 8
+  minIdleDuration: 0.5
+  maxIdleDuration: 1.5
+  damage: 2
   attackRange: 1.5
   attackCooldown: 1.2
   attackHitTime: 0.3
-  maxHealth: 50
+  maxHealth: 10
+  hurtDuration: 0.35
+  knockbackForce: 3
+  deathDestroyDelay: 2
+  deathFadeDuration: 1.5

@@ -1,6 +1,9 @@
 using UnityEngine;
-using Enemy;
+using Enemy; // IDamageable
 
+/// <summary>
+/// 使 PlayerHealth 暴露 IDamageable 接口，供敌人 Attack / Trap 等调用。
+/// </summary>
 [RequireComponent(typeof(PlayerHealth))]
 public class PlayerHealthAdapter : MonoBehaviour, IDamageable
 {
@@ -13,6 +16,7 @@ public class PlayerHealthAdapter : MonoBehaviour, IDamageable
 
     public void TakeDamage(int damage)
     {
-        health.TakeDamage(damage);
+        if (health != null)
+            health.TakeDamage(damage);
     }
 }

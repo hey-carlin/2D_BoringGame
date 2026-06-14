@@ -3,9 +3,7 @@ using UnityEngine;
 namespace Enemy
 {
     /// <summary>
-    /// 平台来回巡逻状态：
-    /// - 一直朝一个方向走，遇到墙/悬崖立即掉头
-    /// - 没有计时器，没有随机转向，纯障碍物驱动
+    /// 巡逻行走：朝一个方向走，遇墙/悬崖掉头，不停歇。
     /// </summary>
     public class WalkState : EnemyState
     {
@@ -18,11 +16,7 @@ namespace Enemy
         public override void OnEnter()
         {
             flipCooldown = 0f;
-
-            // 保持 patrolFacing 方向，继续走
-            float vx = enemy.patrolFacing;
-            enemy.movement.SetMoveDirection(new Vector2(vx, 0f));
-
+            enemy.movement.MoveAtPatrolSpeed(new Vector2(enemy.patrolFacing, 0f));
             enemy.animator.Play("Walk");
         }
 
@@ -30,17 +24,12 @@ namespace Enemy
         {
             flipCooldown -= Time.deltaTime;
 
-            // ── 唯一转向条件：遇到墙或悬崖 ──
-            if (flipCooldown <= 0f)
+            // 遇墙/悬崖 → 掉头
+            if (flipCooldown <= 0f && enemy.movement.IsPathBlocked())
             {
-                if (enemy.movement.IsPathBlocked())
-                {
-                    flipCooldown = FlipCooldownTime;
-
-                    // 掉头
-                    enemy.patrolFacing = -enemy.patrolFacing;
-                    enemy.movement.SetMoveDirection(new Vector2(enemy.patrolFacing, 0f));
-                }
+                flipCooldown = FlipCooldownTime;
+                enemy.patrolFacing = -enemy.patrolFacing;
+                enemy.movement.MoveAtPatrolSpeed(new Vector2(enemy.patrolFacing, 0f));
             }
         }
 
