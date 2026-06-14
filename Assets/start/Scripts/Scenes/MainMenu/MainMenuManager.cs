@@ -38,7 +38,7 @@ namespace DungeonKIT
         //New game method
         public void NewGame()
         {
-            ScenesManager.Instance.LoadLoadingScene("SampleScene"); //Load game scene
+            ScenesManager.Instance.LoadLoadingScene("Lvl_0"); //Load level 1
         }
 
         public void LoadGame()
