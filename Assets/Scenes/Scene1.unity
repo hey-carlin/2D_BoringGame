@@ -47988,6 +47988,10 @@ PrefabInstance:
       value: 1.5
       objectReference: {fileID: 0}
     - target: {fileID: 5735977633120485677, guid: 37870810637e1794e931b602b299331b, type: 3}
+      propertyPath: disappearAfterDialog
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5735977633120485677, guid: 37870810637e1794e931b602b299331b, type: 3}
       propertyPath: guideDialogs.Array.data[0]
       value: "\u5730\u7262\u7684\u5C16\u523A\u548C\u843D\u77F3\u65E0\u5904\u4E0D\u5728\uFF0C\u8DD1\u8D77\u6765\u7684\u65F6\u5019\u591A\u770B\u811A\u4E0B\uFF0C\u505C\u987F\u592A\u4E45\uFF0C\u5FC3\u5E95\u7684\u7A7A\u6D1E\u5C31\u4F1A\u6162\u6162\u541E\u566C\u4F60\u3002"
       objectReference: {fileID: 0}
@@ -48475,6 +48479,10 @@ PrefabInstance:
     - target: {fileID: 5675409844875852761, guid: 37870810637e1794e931b602b299331b, type: 3}
       propertyPath: m_Radius
       value: 1.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 5735977633120485677, guid: 37870810637e1794e931b602b299331b, type: 3}
+      propertyPath: disappearAfterDialog
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
