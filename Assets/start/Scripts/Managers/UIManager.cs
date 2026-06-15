@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -23,7 +23,7 @@ namespace DungeonKIT
         public Text moneyText, bottleText, keyText; //UI text
 
         [Header("Screens GameObjects")]
-        public GameObject dialogGO, shopGO;
+        public GameObject dialogGO, dialogGO_Guide, shopGO;
         public GameObject pauseGo;
         public GameObject gameoverGO;
         public GameObject mobileUIGO;
@@ -31,6 +31,8 @@ namespace DungeonKIT
         public bool isPause;
 
         public event EventHandler dialogClosed; //Close dialog event
+
+        private bool dialogJustOpened; //Prevent same-frame E key from skipping first dialog
 
         //Singleton method
         void SingletonInit()
@@ -53,7 +55,7 @@ namespace DungeonKIT
         private void Start()
         {
             //Check active platform
-#if UNITY_ANDROID || UNITY_IOS //mobile 
+#if UNITY_ANDROID || UNITY_IOS //mobile
 
             mobileUIGO.SetActive(true); //Enable mobile UI
 #endif
@@ -66,10 +68,33 @@ namespace DungeonKIT
 
         }
 
+        private void Update()
+        {
+            // Skip this frame if dialog was just opened (prevents same E press from advancing)
+            if (dialogJustOpened)
+            {
+                dialogJustOpened = false;
+                return;
+            }
+
+            // Handle dialog navigation: press E to advance to next dialog or close
+            bool anyDialogOpen = (dialogGO != null && dialogGO.activeSelf) ||
+                                 (dialogGO_Guide != null && dialogGO_Guide.activeSelf);
+
+            if (anyDialogOpen && InputManager.Interaction)
+            {
+                InputManager.Interaction = false;
+                if (!dialogManager.NextDialog())
+                {
+                    CloseDialogMenu();
+                }
+            }
+        }
+
         //Update ui method
         public void UpdateUI()
         {
-            UpdateHP(); //Update HP 
+            UpdateHP(); //Update HP
             moneyText.text = playerStats.money.ToString(); //Update ui money text
             bottleText.text = playerStats.bottles.ToString(); //Update ui bottle text
             keyText.text = playerStats.doorKeys.Count.ToString();
@@ -85,7 +110,7 @@ namespace DungeonKIT
             }
             HPUIObjects.Clear(); //Clear list
 
-            //Loop for spawn new 
+            //Loop for spawn new
             for (int i = 0; i < playerStats.HP.max; i++)
             {
                 Image hpIcon = Instantiate(hpIconPrefab, hpParent).GetComponent<Image>(); //Spawn prefab
@@ -98,18 +123,31 @@ namespace DungeonKIT
                 {
                     hpIcon.sprite = hpDisableSprite; //Set disable hp
                 }
-                HPUIObjects.Add(hpIcon.gameObject); //Add object to list 
+                HPUIObjects.Add(hpIcon.gameObject); //Add object to list
             }
         }
 
-        //Show dialog menu method
+        //Show dialog menu method (uses DialogConfig .asset)
         public void ShowDialogMenu(DialogConfig dialogConfig)
         {
             isPause = true; //set pause
 
+            dialogJustOpened = true; //Prevent same-frame E key from skipping first dialog
             dialogGO.SetActive(true); //Show dialog screen gameobject
             dialogManager.SetDialogConfig(dialogConfig); //set config to dialog
         }
+
+        //Show guide/NPC1 dialog menu (uses string array directly, no .asset needed)
+        public void ShowGuideDialog(string[] dialogs)
+        {
+            isPause = true; //set pause
+
+            dialogJustOpened = true; //Prevent same-frame E key from skipping first dialog
+            if (dialogGO_Guide != null)
+                dialogGO_Guide.SetActive(true); //Show guide dialog screen gameobject
+            dialogManager.SetGuideDialog(dialogs); //set guide dialog directly from strings
+        }
+
         //Show shop menu method
         public void ShowShopMenu()
         {
@@ -123,6 +161,8 @@ namespace DungeonKIT
             dialogClosed(this, new EventArgs()); //Activate event
 
             dialogGO.SetActive(false); //Disable dialog screen
+            if (dialogGO_Guide != null)
+                dialogGO_Guide.SetActive(false); //Disable guide dialog screen
         }
         //Close shop menu method
         public void CloseShopMenu(object sender, EventArgs e)
@@ -133,7 +173,7 @@ namespace DungeonKIT
         public void Pause()
         {
             isPause = !isPause; //Reverse pause status
-            pauseGo.SetActive(!pauseGo.activeSelf); //Reverse pause screen active status 
+            pauseGo.SetActive(!pauseGo.activeSelf); //Reverse pause screen active status
         }
         //UI GameOver method
         public void GameOver()
@@ -149,7 +189,7 @@ namespace DungeonKIT
 
 
         //Check active platform
-#if UNITY_ANDROID || UNITY_IOS //mobile 
+#if UNITY_ANDROID || UNITY_IOS //mobile
         public void HealthBtn()
         {
             playerStats.Health(); //Player health hp
