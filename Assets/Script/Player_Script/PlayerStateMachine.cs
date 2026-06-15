@@ -36,6 +36,7 @@ namespace Player
         public float heavyCooldown = 2f;
         public float comboWindow = 3f;
         public float attackForwardStep = 2.5f;
+        public float attack2JumpForce = 8f;              // Attack2 (W+J) 跳击力度
 
         [Header("Damage")]
         public float invincibilityDuration = 1.2f;

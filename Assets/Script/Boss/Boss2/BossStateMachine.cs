@@ -2,53 +2,46 @@ using UnityEngine;
 using Game.Boss;
 
 /// <summary>
-/// Boss 表现层：动画 + 移动 + 前摇闪烁。
-/// 不包含决策逻辑。
+/// Boss2 表现层：浮空动画 + 移动 + 朝向 + 前摇闪烁。
 /// </summary>
 public class BossStateMachine : MonoBehaviour
 {
-    [Header("Movement")]
-    public float baseMoveSpeed = 4f;
+    public float moveSpeed = 3f;
+    public float hoverAmplitude = 0.4f;
+    public float hoverFrequency = 1.2f;
 
     [Header("Visual")]
     public SpriteRenderer bossSprite;
-    public Color telegraphColor = new Color(1f, 0.5f, 0.5f, 1f);
+    public Color telegraphColor = new Color(1f, 0.4f, 0.4f, 1f);
 
     private Animator animator;
     private Rigidbody2D rb;
-    private BossPhase currentPhase = BossPhase.Phase1;
     private BossState currentState = BossState.Idle;
-    private float speedMultiplier = 1f;
+    private BossPhase currentPhase = BossPhase.Phase1;
     private Color originalColor;
-    private bool isFlashing;
+    private float hoverBaseY;
 
-    public BossPhase CurrentPhase => currentPhase;
     public BossState CurrentState => currentState;
-    public bool IsIdle => currentState == BossState.Idle;
-    public Animator Anim => animator;
-    public Rigidbody2D Rb => rb;
+    public BossPhase CurrentPhase => currentPhase;
 
     private void Awake()
     {
         animator = GetComponent<Animator>();
         rb = GetComponent<Rigidbody2D>();
-        if (bossSprite == null) bossSprite = GetComponentInChildren<SpriteRenderer>();
         if (bossSprite != null) originalColor = bossSprite.color;
     }
 
     private void Start()
     {
+        hoverBaseY = transform.position.y;
         SetPhase(BossPhase.Phase1);
         SetState(BossState.Idle);
     }
-
-    // ═══════ 阶段 / 状态 ═══════
 
     public void SetPhase(BossPhase phase)
     {
         currentPhase = phase;
         animator.SetInteger("Phase", (int)phase);
-        speedMultiplier = phase == BossPhase.Phase2 ? 1.4f : 1f;
     }
 
     public void SetState(BossState state)
@@ -58,7 +51,37 @@ public class BossStateMachine : MonoBehaviour
         animator.SetInteger("State", (int)state);
     }
 
-    // ═══════ 受击 ═══════
+    // ═══ 移动 ═══
+
+    /// <summary>浮空追踪玩家，保持理想距离</summary>
+    public void HoverToward(Vector2 playerPos, float idealDist)
+    {
+        if (rb == null) return;
+        Vector2 toPlayer = playerPos - (Vector2)transform.position;
+        float dist = toPlayer.magnitude;
+
+        float horz = 0f;
+        if (Mathf.Abs(dist - idealDist) > 0.5f)
+            horz = Mathf.Sign(toPlayer.x) * moveSpeed * Mathf.Clamp01(Mathf.Abs(dist - idealDist) / 3f);
+
+        float targetY = hoverBaseY + Mathf.Sin(Time.time * hoverFrequency) * hoverAmplitude;
+        float vert = (targetY - transform.position.y) * 3f;
+
+        rb.velocity = new Vector2(horz, vert);
+    }
+
+    public void StopMoving()
+    {
+        if (rb != null) rb.velocity = Vector2.zero;
+    }
+
+    public void FaceDirection(float xDir)
+    {
+        if (Mathf.Abs(xDir) < 0.01f) return;
+        Vector3 s = transform.localScale;
+        s.x = Mathf.Abs(s.x) * Mathf.Sign(xDir);
+        transform.localScale = s;
+    }
 
     public void Hit()
     {
@@ -78,56 +101,33 @@ public class BossStateMachine : MonoBehaviour
         animator.SetTrigger("Dead");
     }
 
-    // ═══════ 移动 ═══════
-
-    public void MoveToward(Vector2 dir)
-    {
-        if (rb == null) return;
-        rb.velocity = new Vector2(dir.x * baseMoveSpeed * speedMultiplier, rb.velocity.y);
-    }
-
-    public void StopMoving()
-    {
-        if (rb == null) return;
-        rb.velocity = new Vector2(0f, rb.velocity.y);
-    }
-
-    public void FaceDirection(float xDir)
-    {
-        if (Mathf.Abs(xDir) < 0.01f) return;
-        Vector3 s = transform.localScale;
-        s.x = Mathf.Abs(s.x) * Mathf.Sign(xDir);
-        transform.localScale = s;
-    }
-
-    // ═══════ 视觉 ═══════
+    // ═══ 视觉 ═══
 
     public void StartTelegraphFlash()
     {
         if (bossSprite == null) return;
         StopAllCoroutines();
-        StartCoroutine(TelegraphFlashRoutine());
-    }
-
-    private System.Collections.IEnumerator TelegraphFlashRoutine()
-    {
-        isFlashing = true;
-        float interval = 0.08f;
-        bool on = false;
-        while (isFlashing)
-        {
-            on = !on;
-            bossSprite.color = on ? telegraphColor : originalColor;
-            yield return new WaitForSeconds(interval);
-        }
-        bossSprite.color = originalColor;
+        StartCoroutine(FlashRoutine());
     }
 
     public void StopTelegraphFlash()
     {
-        isFlashing = false;
+        StopAllCoroutines();
         if (bossSprite != null) bossSprite.color = originalColor;
     }
 
-    public float GetCurrentMoveSpeed() => baseMoveSpeed * speedMultiplier;
+    private System.Collections.IEnumerator FlashRoutine()
+    {
+        float interval = 0.06f;
+        bool on = false;
+        while (true)
+        {
+            on = !on;
+            if (bossSprite != null)
+                bossSprite.color = on ? telegraphColor : originalColor;
+            yield return new WaitForSeconds(interval);
+        }
+    }
+
+    public void UpdateHoverBaseY() => hoverBaseY = transform.position.y;
 }

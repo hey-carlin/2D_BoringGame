@@ -14,18 +14,34 @@ namespace Player
             timer = sm.activeAttackDuration;
             dealtDamage = false;
 
-            // ── 攻击前冲步 ──
             bool isHeavy = sm.animator.GetCurrentAnimatorStateInfo(0).IsName("Heavy_Attack");
-            if (!isHeavy)
+
+            if (isHeavy)
             {
-                float stepDir = sm.FacingDirection();
-                sm.currentMoveSpeed = stepDir * sm.attackForwardStep;
-                sm.rb.velocity = new Vector2(sm.currentMoveSpeed, sm.rb.velocity.y);
+                // 重击定在原地
+                sm.currentMoveSpeed = 0f;
+                sm.rb.velocity = new Vector2(0f, sm.rb.velocity.y);
             }
             else
             {
-                sm.currentMoveSpeed = 0f;
-                sm.rb.velocity = new Vector2(0f, sm.rb.velocity.y);
+                int attackID = sm.animator.GetInteger("AttackID");
+                float stepDir = sm.FacingDirection();
+
+                if (attackID == 1)
+                {
+                    // Attack1 (J) 原地攻击，不移动
+                    sm.currentMoveSpeed = 0f;
+                    sm.rb.velocity = new Vector2(0f, sm.rb.velocity.y);
+                }
+                else
+                {
+                    // Attack2/3/4 向前突进
+                    sm.currentMoveSpeed = stepDir * sm.attackForwardStep;
+
+                    // Attack2 (W+J) 额外向上跳击
+                    float verticalBoost = attackID == 2 ? sm.attack2JumpForce : 0f;
+                    sm.rb.velocity = new Vector2(sm.currentMoveSpeed, sm.rb.velocity.y + verticalBoost);
+                }
             }
         }
 
