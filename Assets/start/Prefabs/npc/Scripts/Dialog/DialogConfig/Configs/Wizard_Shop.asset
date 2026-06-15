@@ -10,7 +10,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 414d796b7579cc84c8554ed94fcedcc3, type: 3}
   m_Name: Wizard_Shop
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier:
   name: The Wizard
   dialogs:
   - dialogText: Greetings you wanderer, you can replenish my reserves

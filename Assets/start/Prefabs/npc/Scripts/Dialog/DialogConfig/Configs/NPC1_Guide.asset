@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 414d796b7579cc84c8554ed94fcedcc3, type: 3}
+  m_Name: NPC1_Guide
+  m_EditorClassIdentifier:
+  name: NPC1
+  dialogs:
+  - dialogText: "你手中的暗刃可以驱散这些影子，挥砍便能击退它们。地牢的尖刺和落石无处不在，跑起来的时候多看脚下，停顿太久，心底的空洞就会慢慢吞噬你。沿着主路向前，左侧囚牢的角落藏着散落的灵魂碎片，那是能让你保持清醒的东西。"
+  - dialogText: Press E to interact with NPCs, and Q to use health potions when injured.
+  - dialogText: Good luck on your adventure, brave wanderer!
