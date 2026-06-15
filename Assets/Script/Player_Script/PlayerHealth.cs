@@ -64,6 +64,11 @@ public class PlayerHealth : MonoBehaviour
                 break;
             case "item_coin":
                 break;
+            case "item_soul_fragment":
+                DungeonKIT.PlayerStats.Instance.soulFragments++;
+                DungeonKIT.UIManager.Instance?.UpdateUI();
+                Debug.Log($"灵魂碎片: {DungeonKIT.PlayerStats.Instance.soulFragments}");
+                break;
             default:
                 Heal(10);
                 break;

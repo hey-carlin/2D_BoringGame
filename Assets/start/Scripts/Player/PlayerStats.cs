@@ -16,6 +16,7 @@ namespace DungeonKIT
         public DoubleInt HP = new DoubleInt(3, 3);
         public int money;
         public int bottles;
+        public int soulFragments = 0;                        // 灵魂碎片数量
         public Dictionary<int, bool> doorKeys = new Dictionary<int, bool>();
 
         [Header("Parameters")]

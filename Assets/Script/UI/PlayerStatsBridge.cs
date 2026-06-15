@@ -28,10 +28,28 @@ public class PlayerStatsBridge : MonoBehaviour
         EnsureSingleton<PlayerStats>();
         Debug.Log($"[Bridge] PlayerStats.Instance = {PlayerStats.Instance != null}");
 
-        // 2. 加载 GameUI 叠加场景
-        Debug.Log("[Bridge] 正在加载 GameUI 场景...");
-        ScenesManager.Instance.LoadAdditiveScene("GameUI");
-        Debug.Log("[Bridge] LoadAdditiveScene(\"GameUI\") 调用完成");
+        // 2. 加载 GameUI 叠加场景（先检查避免重复加载）
+        if (!IsSceneLoaded("GameUI"))
+        {
+            Debug.Log("[Bridge] 正在加载 GameUI 场景...");
+            ScenesManager.Instance.LoadAdditiveScene("GameUI");
+            Debug.Log("[Bridge] LoadAdditiveScene(\"GameUI\") 调用完成");
+        }
+        else
+        {
+            Debug.Log("[Bridge] GameUI 场景已加载，跳过重复加载。");
+        }
+    }
+
+    /// <summary>检查场景是否已加载</summary>
+    private bool IsSceneLoaded(string sceneName)
+    {
+        for (int i = 0; i < UnityEngine.SceneManagement.SceneManager.sceneCount; i++)
+        {
+            if (UnityEngine.SceneManagement.SceneManager.GetSceneAt(i).name == sceneName)
+                return true;
+        }
+        return false;
     }
 
     private void Start()

@@ -199,7 +199,7 @@ public class BossAI : MonoBehaviour
         Gizmos.color = new Color(1f, 1f, 0f, 0.15f); Gizmos.DrawWireSphere(p, aggroRange);
         Gizmos.color = new Color(1f, 0.5f, 0f, 0.1f); Gizmos.DrawWireSphere(p, loseAggroRange);
         var playerObj = GameObject.FindGameObjectWithTag("Player");
-        if (playerObj != null) { Gizmos.color = Color.red; Gizmos.DrawLine(p, playerObj.position); }
+        if (playerObj != null) { Gizmos.color = Color.red; Gizmos.DrawLine(p, playerObj.transform.position); }
     }
 #endif
 }

@@ -97,7 +97,7 @@ namespace DungeonKIT
             UpdateHP(); //Update HP
             moneyText.text = playerStats.money.ToString(); //Update ui money text
             bottleText.text = playerStats.bottles.ToString(); //Update ui bottle text
-            keyText.text = playerStats.doorKeys.Count.ToString();
+            keyText.text = playerStats.soulFragments.ToString();
         }
 
         //Update hp method
