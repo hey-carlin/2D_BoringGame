@@ -1,28 +1,30 @@
 using UnityEngine;
 using Game.Boss;
 
+/// <summary>
+/// Boss 血量：2 阶段阈值 + 护盾拦截。
+/// </summary>
 public class BossHealth : MonoBehaviour
 {
     [Header("Health")]
     public int maxHealth = 1000;
 
     public int Health { get; private set; }
+    public float HealthPercent => (float)Health / maxHealth;
     public BossPhase CurrentPhase { get; private set; } = BossPhase.Phase1;
 
-    /// <summary>受伤事件：参数为剩余血量</summary>
     public System.Action<int> OnDamaged;
-    /// <summary>死亡事件</summary>
     public System.Action OnDied;
-    /// <summary>进入 P2 事件</summary>
     public System.Action OnPhase2Entered;
+    public System.Action OnPhaseChanged;
 
     private BossStateMachine sm;
-    private BossAI ai;
+    private BossShield shield;
 
     private void Awake()
     {
         sm = GetComponent<BossStateMachine>();
-        ai = GetComponent<BossAI>();
+        shield = GetComponent<BossShield>();
         Health = maxHealth;
     }
 
@@ -30,11 +32,11 @@ public class BossHealth : MonoBehaviour
     {
         if (Health <= 0) return;
 
-        // 护盾减伤
-        if (ai != null && ai.IsShieldActive())
+        // 护盾吸收伤害
+        if (shield != null && shield.IsActive)
         {
-            damage = Mathf.RoundToInt(damage * (1f - ai.GetShieldReduction()));
-            sm.ShieldHit();
+            damage = shield.AbsorbDamage(damage);
+            if (damage <= 0) return; // 完全吸收
         }
 
         Health -= damage;
@@ -43,20 +45,18 @@ public class BossHealth : MonoBehaviour
 
         if (Health <= 0)
         {
-            sm.Die();
-            OnDied?.Invoke();
+            Die();
             return;
         }
 
-        // P1 → P2 转换
+        // P1 → P2
         if (Health <= maxHealth * 0.5f && CurrentPhase == BossPhase.Phase1)
         {
             EnterPhase2();
         }
-        else if (ai == null || !ai.IsShieldActive())
+        else if (shield == null || !shield.IsActive)
         {
-            // 非护盾状态下受伤播放受击
-            sm.Hit();
+            sm.Hit(); // 无护盾受伤硬直
         }
     }
 
@@ -65,5 +65,12 @@ public class BossHealth : MonoBehaviour
         CurrentPhase = BossPhase.Phase2;
         sm.SetPhase(BossPhase.Phase2);
         OnPhase2Entered?.Invoke();
+        OnPhaseChanged?.Invoke();
+    }
+
+    private void Die()
+    {
+        sm.Die();
+        OnDied?.Invoke();
     }
 }

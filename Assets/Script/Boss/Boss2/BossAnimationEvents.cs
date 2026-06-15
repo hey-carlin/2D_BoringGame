@@ -1,51 +1,35 @@
 using UnityEngine;
-using Game.Boss;
 
 /// <summary>
-/// 挂载在 Boss Animator 上，由 Animation Events 调用。
-/// 每个攻击/技能动画结束后回调对应方法，由 BossAI 监听处理。
+/// 动画事件 → C# 事件。每个动画的最后一帧调用对应的 Finished 方法。
+///
+/// 链条动画（Casting→Spell、TeleportStart→TeleportEnd）：
+///   动画 A 最后一帧调用 OnXxxFinished → Phase 脚本收到回调 → 切到动画 B
 /// </summary>
 public class BossAnimationEvents : MonoBehaviour
 {
-    private BossStateMachine sm;
-
-    // C# 事件 — BossAI 订阅这些
     public System.Action OnMeleeAttackEnd;
-    public System.Action OnCastingEnd;
-    public System.Action OnCreateShieldEnd;
-    public System.Action OnExplodeEnd;
-    public System.Action OnSummonEnd;
     public System.Action OnSpellEnd;
-    public System.Action OnCastSpellEnd;
-    public System.Action OnTeleportationEnd;
-    public System.Action OnHurtEnd;
+    public System.Action OnCastingEnd;          // 施法引导结束 → 触发 Spell
+    public System.Action OnCreateShieldEnd;
+    public System.Action OnTeleportStartEnd;    // 传送消失结束 → 瞬移 → 触发 TeleportEnd
+    public System.Action OnTeleportEndEnd;      // 传送出现结束 → 进入 Rest
     public System.Action OnShieldHitEnd;
-    /// <summary>通用技能结束事件（BossAI 订阅此事件）</summary>
-    public System.Action OnAnySkillEnd;
+    public System.Action OnHurtEnd;
+    public System.Action OnRestEnd;
+    public System.Action OnAnySkillEnd;         // 兼容旧动画
 
-    private void Awake()
-    {
-        sm = GetComponent<BossStateMachine>();
-    }
+    // ── Animation Events 入口 ──
 
-    // ── Animation Events（在动画关键帧调用）──
+    public void OnMeleeAttackFinished()    => OnMeleeAttackEnd?.Invoke();
+    public void OnSpellFinished()          => OnSpellEnd?.Invoke();
+    public void OnCastingFinished()        => OnCastingEnd?.Invoke();
+    public void OnCreateShieldFinished()   => OnCreateShieldEnd?.Invoke();
+    public void OnTeleportStartFinished()  => OnTeleportStartEnd?.Invoke();
+    public void OnTeleportEndFinished()    => OnTeleportEndEnd?.Invoke();
+    public void OnShieldHitFinished()      => OnShieldHitEnd?.Invoke();
+    public void OnHurtFinished()           => OnHurtEnd?.Invoke();
+    public void OnRestFinished()           => OnRestEnd?.Invoke();
 
-    public void OnMeleeAttackFinished() => OnMeleeAttackEnd?.Invoke();
-    public void OnCastingFinished() => OnCastingEnd?.Invoke();
-    public void OnCreateShieldFinished() => OnCreateShieldEnd?.Invoke();
-    public void OnExplodeFinished() => OnExplodeEnd?.Invoke();
-    public void OnSummonFinished() => OnSummonEnd?.Invoke();
-    public void OnSpellFinished() => OnSpellEnd?.Invoke();
-    public void OnCastSpellFinished() => OnCastSpellEnd?.Invoke();
-    public void OnTeleportationFinished() => OnTeleportationEnd?.Invoke();
-    public void OnHurtFinished() => OnHurtEnd?.Invoke();
-    public void OnShieldHitFinished() => OnShieldHitEnd?.Invoke();
-
-    /// <summary>通用技能结束回调 — 旧动画事件的入口</summary>
-    public void OnSkillEnd()
-    {
-        if (sm != null)
-            sm.SetState(BossState.Idle);
-        OnAnySkillEnd?.Invoke();
-    }
+    public void OnSkillEnd() => OnAnySkillEnd?.Invoke();
 }
