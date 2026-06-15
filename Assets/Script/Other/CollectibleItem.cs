@@ -152,13 +152,27 @@ public class CollectibleItem : MonoBehaviour
 
         Debug.Log($"[CollectibleItem] 玩家获得道具: {itemName} (ID: {itemID})");
 
-        onCollected?.Invoke(this);
+        // 1. 触发 Inspector 绑定的 UnityEvent（如果有手动绑定）
+        if (onCollected != null && onCollected.GetPersistentEventCount() > 0)
+        {
+            onCollected.Invoke(this);
+        }
+        else
+        {
+            // 2. 否则自动调用 PlayerHealth.OnCollectItem（无手动绑定时，避免重复计数）
+            if (playerHealth == null)
+                playerHealth = FindObjectOfType<PlayerHealth>();
+            if (playerHealth != null)
+                playerHealth.OnCollectItem(this);
+        }
 
         if (destroyOnCollect)
         {
             StartCoroutine(CollectEffectRoutine());
         }
     }
+
+    private PlayerHealth playerHealth;
 
     System.Collections.IEnumerator CollectEffectRoutine()
     {

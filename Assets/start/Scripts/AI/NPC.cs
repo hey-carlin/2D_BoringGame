@@ -20,6 +20,10 @@ namespace DungeonKIT
         [Tooltip("Unique ID shared by all instances of this character across scenes.")]
         public string npcId;
 
+        [Header("消失设置")]
+        [Tooltip("勾选后，对话完成时 NPC 自动消失")]
+        public bool disappearAfterDialog = false;
+
         [Header("Staged Dialog (multi-encounter)")]
         [Tooltip("Enable to use dialogStages / guideDialogStages based on game progress.")]
         public bool useStages;
@@ -36,10 +40,29 @@ namespace DungeonKIT
         public string[] guideDialogs; //Dialog texts edited directly here, no ScriptableObject needed
 
         InteractionTrigger interactionTrigger; // interaction trigger
+        private bool hasSubscribed;              // 防止重复订阅
+        private bool waitingForDialogClose;     // 标记是否正在等待对话结束
 
         private void Start()
         {
             interactionTrigger = GetComponent<InteractionTrigger>();
+        }
+
+        /// <summary>确保订阅了对话关闭事件（延迟订阅，等 GameUI 加载完毕）</summary>
+        void EnsureSubscribed()
+        {
+            if (hasSubscribed) return;
+            if (UIManager.Instance != null)
+            {
+                UIManager.Instance.dialogClosed += OnDialogClosed;
+                hasSubscribed = true;
+            }
+        }
+
+        void OnDestroy()
+        {
+            if (hasSubscribed && UIManager.Instance != null)
+                UIManager.Instance.dialogClosed -= OnDialogClosed;
         }
 
         private void Update()
@@ -60,6 +83,8 @@ namespace DungeonKIT
         //Interaction method
         void Interaction()
         {
+            EnsureSubscribed(); // 确保事件已订阅（此时 GameUI 一定存在）
+
             if (useStages && !string.IsNullOrEmpty(npcId))
             {
                 int stage = GameProgressManager.Instance != null
@@ -70,6 +95,7 @@ namespace DungeonKIT
                 if (dialogStages != null && stage < dialogStages.Length && dialogStages[stage] != null)
                 {
                     UIManager.Instance.ShowDialogMenu(dialogStages[stage]);
+                    waitingForDialogClose = true;
                 }
                 // Then try Guide UI stages
                 else if (guideDialogStages != null && stage < guideDialogStages.Length
@@ -77,11 +103,13 @@ namespace DungeonKIT
                     && guideDialogStages[stage].dialogs.Length > 0)
                 {
                     UIManager.Instance.ShowGuideDialog(guideDialogStages[stage].dialogs);
+                    waitingForDialogClose = true;
                 }
                 else
                 {
                     // Out of staged dialogs — fall back to original single config
                     ShowOriginalDialog();
+                    waitingForDialogClose = true;
                     return;
                 }
 
@@ -92,6 +120,7 @@ namespace DungeonKIT
             else
             {
                 ShowOriginalDialog();
+                waitingForDialogClose = true;
             }
         }
 
@@ -101,6 +130,19 @@ namespace DungeonKIT
                 UIManager.Instance.ShowGuideDialog(guideDialogs);
             else
                 UIManager.Instance.ShowDialogMenu(dialogConfig);
+        }
+
+        /// <summary>对话关闭时触发，检查是否需要消失</summary>
+        void OnDialogClosed(object sender, System.EventArgs e)
+        {
+            if (!waitingForDialogClose) return;
+            waitingForDialogClose = false;
+
+            if (disappearAfterDialog)
+            {
+                Debug.Log($"[NPC] {name}: 对话结束，NPC 消失");
+                gameObject.SetActive(false);
+            }
         }
     }
 }
