@@ -1,101 +1,130 @@
 using UnityEngine;
-using Game.Boss;
+using Enemy; // IDamageable
 
 /// <summary>
-/// Boss2 — 恶魔城风格：
-///   浮空追击 + 前摇 + 攻击 + 休息窗口。
-///
-///   P1: MeleeAttack / Casting→Spell / CreateShield(护盾HP) / Teleport
-///   P2 (≤50%): + Explode / Summon / CastSpell，更快节奏
+/// Boss2 — 参照 Boss1 简化：
+///   P1: 近战 / 施法→法术 / 护盾 / 传送
+///   P2 (≤40%): + 爆炸 / 召唤 / 远程法术
 /// </summary>
-public class BossAI : MonoBehaviour
+public class BossAI : MonoBehaviour, IDamageable
 {
-    [Header("索敌")]
+    [Header("移动")]
+    public float moveSpeed = 3f;
     public float chaseRange = 15f;
-    public float idealDistance = 5f;
+    public float idealDistance = 5f;        // 浮空保持的理想距离
+    public float hoverAmplitude = 0.4f;     // 浮空摆动幅度
+    public float hoverFrequency = 1.2f;
 
-    [Header("攻击 Timing")]
-    public float telegraphTime = 0.35f;
-    public float restTime = 1f;             // 攻击后休息窗口（玩家输出时机）
-    public float attackCooldown = 1.2f;     // P1 攻击冷却
-
-    [Header("P1 攻击权重")]
-    public float meleeWeight = 3f;
-    public float spellWeight = 2f;
-    public float teleportWeight = 1.5f;
-
-    [Header("P1 攻击执行时长")]
+    [Header("攻击 — MeleeAttack")]
+    public float meleeCooldown = 1.2f;
     public float meleeExecTime = 0.8f;
+    public int meleeDamage = 15;
+    public Transform meleeAttackPoint;
+    public float meleeRadius = 1.5f;
+
+    [Header("施法→法术 — Casting→Spell")]
+    public float spellCooldown = 3f;
     public float castingExecTime = 1f;
     public float spellExecTime = 1f;
+    public int spellDamage = 20;
+    public Transform spellAttackPoint;
+    public float spellRadius = 2f;
+
+    [Header("护盾 — CreateShield")]
+    public int shieldHP = 150;
+    public float shieldCooldown = 12f;
     public float shieldExecTime = 1f;
+
+    [Header("传送 — Teleport")]
+    public float teleportCooldown = 8f;
     public float teleStartTime = 0.8f;
     public float teleEndTime = 0.8f;
-
-    [Header("护盾")]
-    public int shieldHP = 150;
-    public float shieldReactivateDelay = 10f; // 护盾破碎后多久可重开
-    public bool shieldBroken;               // [只读] 护盾是否已碎
-
-    [Header("传送")]
     public float teleportMinDist = 5f;
     public float teleportMaxDist = 10f;
 
-    [Header("P2 — 解锁攻击")]
-    public float p2AttackCooldown = 0.8f;
-    public float p2TelegraphTime = 0.25f;
+    [Header("P2 阶段转换")]
+    [Range(0f, 1f)] public float phase2Threshold = 0.4f;
+    public float phaseTransitionTime = 2f;
+
+    [Header("P2 — Explode")]
+    public float explodeCooldown = 6f;
     public float explodeExecTime = 1.5f;
+    public int explodeDamage = 30;
+    public float explodeRadius = 3f;
+
+    [Header("P2 — Summon")]
+    public float summonCooldown = 10f;
     public float summonExecTime = 1.5f;
+    public GameObject summonPrefab;
+    public Transform[] summonSpawnPoints;
+    public int maxSummonsAlive = 3;
+
+    [Header("P2 — CastSpell")]
+    public float castSpellCooldown = 4f;
     public float castSpellExecTime = 1.2f;
+    public int castSpellDamage = 25;
+    public Transform castSpellAttackPoint;
+    public float castSpellRadius = 2.5f;
 
     [Header("生命值")]
     public int maxHealth = 600;
-
-    [Header("碰触体")]
-    public BossAttackHitbox meleeHitbox;
-    public BossAttackHitbox spellHitbox;
-    public BossAttackHitbox explodeHitbox;
-
-    [Header("召唤")]
-    public GameObject summonPrefab;
-    public Transform[] summonSpawnPoints;
+    public float hurtInvincibleTime = 0.3f;
 
     // ═══ 内部 ═══
 
-    private enum SubStep { Idle, Telegraph, Execute, ChainWait, Rest }
-    private SubStep step = SubStep.Idle;
-    private float stepTimer;
+    private enum State
+    {
+        Idle, Melee, Casting, Spell, Shielding, ShieldHit,
+        TeleStart, TeleEnd, Exploding, Summoning, CastSpelling,
+        PhaseTrans, Hurt, Dead
+    }
+    private State state = State.Idle;
+    private float stateTimer;
 
-    private BossStateMachine sm;
     private Transform player;
+    private Rigidbody2D rb;
     private Animator anim;
+    private SpriteRenderer sr;
+    private float hoverBaseY;
 
     private int currentHealth;
     private int shieldCurrentHP;
     private bool shieldActive;
-    private float shieldReactivateTimer;
+    private bool shieldBroken;
     private bool isDead;
     private bool isPhase2;
-    private float lastAttackTime = -999f;
 
-    private BossState currentAttack;
-    private BossState lastAttack;
-    private float idealDist;
+    private System.Collections.Generic.List<GameObject> aliveSummons = new System.Collections.Generic.List<GameObject>();
+    private float HealthPercent => (float)currentHealth / maxHealth;
+    private float lastMeleeTime = -999f;
+    private float lastSpellTime = -999f;
+    private float lastShieldTime = -999f;
+    private float lastTeleportTime = -999f;
+    private float lastExplodeTime = -999f;
+    private float lastSummonTime = -999f;
+    private float lastCastSpellTime = -999f;
     private float invincibleTimer;
 
     // ═══ 初始化 ═══
 
     private void Start()
     {
-        sm = GetComponent<BossStateMachine>();
-        anim = GetComponent<Animator>();
-
         var obj = GameObject.FindGameObjectWithTag("Player");
         if (obj == null) { Debug.LogError("[Boss2] 未找到 Player！"); enabled = false; return; }
         player = obj.transform;
 
+        rb = GetComponent<Rigidbody2D>();
+        anim = GetComponent<Animator>();
+        sr = GetComponent<SpriteRenderer>();
+
+        if (rb == null) Debug.LogError("[Boss2] 缺少 Rigidbody2D！");
+        if (anim == null) Debug.LogError("[Boss2] 缺少 Animator！");
+
+        if (rb != null) rb.gravityScale = 0f;
         currentHealth = maxHealth;
+        hoverBaseY = transform.position.y;
         IgnorePlayerCollision();
+        Debug.Log("[Boss2] 初始化完成，开始追击玩家");
     }
 
     private void IgnorePlayerCollision()
@@ -103,12 +132,17 @@ public class BossAI : MonoBehaviour
         if (player == null) return;
         foreach (var pc in player.GetComponents<Collider2D>())
         {
-            if (pc == null || pc.isTrigger) continue;
+            if (pc == null) continue;
             foreach (var bc in GetComponents<Collider2D>())
             {
-                if (bc == null || bc.isTrigger) continue;
+                if (bc == null) continue;
                 Physics2D.IgnoreCollision(pc, bc, true);
             }
+        }
+        // Boss 身体碰撞体全部变 Trigger
+        foreach (var col in GetComponents<Collider2D>())
+        {
+            col.isTrigger = true;
         }
     }
 
@@ -117,337 +151,272 @@ public class BossAI : MonoBehaviour
     private void Update()
     {
         if (isDead || player == null) return;
+        if (rb == null || anim == null) return;
 
         float dist = Vector2.Distance(transform.position, player.position);
         Vector2 dir = (player.position - transform.position).normalized;
 
-        if (Mathf.Abs(dir.x) > 0.05f) sm.FaceDirection(dir.x);
+        if (sr != null && Mathf.Abs(dir.x) > 0.05f)
+            sr.flipX = dir.x < 0;
+
         Debug.DrawLine(transform.position, player.position, dist <= chaseRange ? Color.yellow : Color.clear);
 
         if (invincibleTimer > 0f) invincibleTimer -= Time.deltaTime;
-        if (shieldReactivateTimer > 0f) shieldReactivateTimer -= Time.deltaTime;
         if (currentHealth <= 0) { Die(); return; }
 
-        // 硬直中
-        if (sm.CurrentState == BossState.Hurt || sm.CurrentState == BossState.ShieldHit)
-            return;
-
-        // 子步骤状态机
-        switch (step)
+        // 阶段转换中
+        if (state == State.PhaseTrans)
         {
-            case SubStep.Idle:
-                if (dist > chaseRange) { sm.StopMoving(); return; }
-                DecideAttack(dist);
-                break;
-
-            case SubStep.Telegraph:
-                stepTimer -= Time.deltaTime;
-                sm.StopMoving();
-                if (stepTimer <= 0f) StartExecute();
-                return;
-
-            case SubStep.Execute:
-                stepTimer -= Time.deltaTime;
-                if (stepTimer <= 0f) OnExecTimeout();
-                return;
-
-            case SubStep.ChainWait:
-                stepTimer -= Time.deltaTime;
-                if (stepTimer <= 0f) StartRest();
-                return;
-
-            case SubStep.Rest:
-                stepTimer -= Time.deltaTime;
-                sm.StopMoving();
-                if (stepTimer <= 0f) FinishRest();
-                return;
-        }
-
-        // 非攻击时浮空追踪
-        if (step == SubStep.Idle)
-            sm.HoverToward(player.position, idealDist);
-    }
-
-    // ═══ 决策 ═══
-
-    private void DecideAttack(float dist)
-    {
-        // 已选好攻击，检查是否到位
-        if (currentAttack != BossState.Idle)
-        {
-            if (Mathf.Abs(dist - idealDist) <= 1f)
+            stateTimer -= Time.deltaTime;
+            if (rb != null) rb.velocity = Vector2.zero;
+            if (stateTimer <= 0f)
             {
-                sm.StopMoving();
-                StartTelegraph();
+                isPhase2 = true;
+                state = State.Idle;
             }
             return;
         }
 
-        // 选新攻击
-        currentAttack = PickAttack();
-        if (currentAttack == BossState.Idle) return;
-
-        idealDist = currentAttack == BossState.MeleeAttack ? 2.5f : idealDistance;
-        lastAttackTime = Time.time;
-
-        if (Mathf.Abs(dist - idealDist) <= 1f)
+        // 受伤 / 护盾受击
+        if (state == State.Hurt || state == State.ShieldHit)
         {
-            sm.StopMoving();
-            StartTelegraph();
-        }
-    }
-
-    private BossState PickAttack()
-    {
-        // 可开盾?
-        bool canShield = !shieldBroken && !shieldActive && shieldReactivateTimer <= 0f;
-
-        float total = 0f;
-        if (lastAttack != BossState.MeleeAttack) total += meleeWeight;
-        if (lastAttack != BossState.Casting) total += spellWeight;
-        if (lastAttack != BossState.TeleportStart) total += teleportWeight;
-        if (canShield && lastAttack != BossState.CreateShield) total += 2f;
-
-        if (!isPhase2 && total <= 0f) return BossState.MeleeAttack;
-
-        // P2 攻击池
-        if (isPhase2)
-        {
-            if (lastAttack != BossState.Explode) total += 2f;
-            if (lastAttack != BossState.Summon) total += 1.5f;
-            if (lastAttack != BossState.CastSpell) total += 1.5f;
+            stateTimer -= Time.deltaTime;
+            if (rb != null) rb.velocity = Vector2.zero;
+            if (stateTimer <= 0f) state = State.Idle;
+            return;
         }
 
-        float roll = Random.Range(0f, total);
-        float c = 0f;
-
-        if (TryAdd(ref c, meleeWeight, BossState.MeleeAttack, roll)) return BossState.MeleeAttack;
-        if (TryAdd(ref c, spellWeight, BossState.Casting, roll)) return BossState.Casting;
-        if (canShield && TryAdd(ref c, 2f, BossState.CreateShield, roll)) return BossState.CreateShield;
-        if (TryAdd(ref c, teleportWeight, BossState.TeleportStart, roll)) return BossState.TeleportStart;
-        if (isPhase2 && TryAdd(ref c, 2f, BossState.Explode, roll)) return BossState.Explode;
-        if (isPhase2 && TryAdd(ref c, 1.5f, BossState.Summon, roll)) return BossState.Summon;
-        if (isPhase2 && TryAdd(ref c, 1.5f, BossState.CastSpell, roll)) return BossState.CastSpell;
-
-        return BossState.MeleeAttack;
-    }
-
-    private bool TryAdd(ref float cursor, float weight, BossState state, float roll)
-    {
-        if (state == lastAttack) return false;
-        cursor += weight;
-        if (roll <= cursor) { lastAttack = state; return true; }
-        return false;
-    }
-
-    // ═══ 前摇 → 执行 ═══
-
-    private void StartTelegraph()
-    {
-        float t = isPhase2 ? p2TelegraphTime : telegraphTime;
-        sm.StartTelegraphFlash(); // 前摇：保持 Idle，只闪烁
-        step = SubStep.Telegraph;
-        stepTimer = t;
-        sm.StopMoving();
-    }
-
-    private void StartExecute()
-    {
-        sm.StopTelegraphFlash();
-        step = SubStep.Execute;
-        sm.SetState(currentAttack);
-
-        switch (currentAttack)
+        // 动作执行中
+        if (state != State.Idle)
         {
-            case BossState.MeleeAttack:
-                stepTimer = meleeExecTime;
-                if (meleeHitbox != null) meleeHitbox.Activate(meleeExecTime);
-                break;
-
-            case BossState.Casting:
-                stepTimer = castingExecTime;
-                break;
-
-            case BossState.CreateShield:
-                stepTimer = shieldExecTime;
-                ActivateShield();
-                shieldReactivateTimer = shieldReactivateDelay;
-                break;
-
-            case BossState.TeleportStart:
-                stepTimer = teleStartTime;
-                break;
-
-            // P2
-            case BossState.Explode:
-                stepTimer = explodeExecTime;
-                if (explodeHitbox != null) explodeHitbox.Activate(explodeExecTime);
-                break;
-
-            case BossState.Summon:
-                stepTimer = summonExecTime;
-                DoSummon();
-                break;
-
-            case BossState.CastSpell:
-                stepTimer = castSpellExecTime;
-                break;
+            stateTimer -= Time.deltaTime;
+            if (rb != null) rb.velocity = Vector2.zero;
+            if (stateTimer <= 0f) state = State.Idle;
+            return;
         }
-        sm.StopMoving();
-    }
 
-    private void OnExecTimeout()
-    {
-        // 非链条攻击 → 直接休息
-        if (currentAttack != BossState.Casting && currentAttack != BossState.TeleportStart)
+        // 脱战
+        if (dist > chaseRange)
         {
-            StartRest();
+            if (rb != null) rb.velocity = Vector2.zero;
+            return;
         }
-        else
-        {
-            // 链条攻击超时 → 模拟动画事件
-            if (currentAttack == BossState.Casting)
-                OnCastingFinished();
-            else if (currentAttack == BossState.TeleportStart)
-                OnTeleportStartFinished();
-        }
+
+        // ── P1 + P2 攻击决策 ──
+        if (TryMelee(dist)) return;
+        if (TrySpell(dist)) return;
+        if (TryShield()) return;
+        if (TryTeleport()) return;
+        if (isPhase2 && TryExplode(dist)) return;
+        if (isPhase2 && TrySummon()) return;
+        if (isPhase2 && TryCastSpell(dist)) return;
+
+        // 浮空追击
+        HoverTowardPlayer(dist);
     }
 
-    // ═══ 链条：Casting → Spell ═══
+    // ═══ 浮空移动 ═══
 
-    public void OnCastingFinished()
+    private void HoverTowardPlayer(float dist)
     {
-        if (step != SubStep.Execute || currentAttack != BossState.Casting) return;
+        if (rb == null) return;
+        Vector2 toPlayer = player.position - transform.position;
+        float horz = 0f;
+        if (Mathf.Abs(dist - idealDistance) > 0.5f)
+            horz = Mathf.Sign(toPlayer.x) * moveSpeed * Mathf.Clamp01(Mathf.Abs(dist - idealDistance) / 3f);
 
-        step = SubStep.ChainWait;
-        sm.SetState(BossState.Spell);
-        stepTimer = spellExecTime;
-        if (spellHitbox != null) spellHitbox.Activate(spellExecTime);
+        float targetY = hoverBaseY + Mathf.Sin(Time.time * hoverFrequency) * hoverAmplitude;
+        float vert = (targetY - transform.position.y) * 3f;
+
+        rb.velocity = new Vector2(horz, vert);
     }
 
-    public void OnSpellFinished()
+    // ═══ 近战 ═══
+
+    private bool TryMelee(float dist)
     {
-        if (step == SubStep.ChainWait)
-            StartRest();
+        if (dist > 3f) return false;
+        if (Time.time < lastMeleeTime + meleeCooldown) return false;
+
+        state = State.Melee;
+        stateTimer = meleeExecTime;
+        lastMeleeTime = Time.time;
+        anim.Play("B2_MeleeAttack");
+        Invoke(nameof(DoMeleeDamage), meleeExecTime * 0.5f);
+        return true;
     }
 
-    // ═══ 链条：TeleportStart → TeleportEnd ═══
-
-    public void OnTeleportStartFinished()
+    private void DoMeleeDamage()
     {
-        if (step != SubStep.Execute || currentAttack != BossState.TeleportStart) return;
-
-        float dir = Random.value > 0.5f ? 1f : -1f;
-        float d = Random.Range(teleportMinDist, teleportMaxDist);
-        transform.position = (Vector2)transform.position + new Vector2(dir * d, 0f);
-        sm.UpdateHoverBaseY();
-
-        step = SubStep.ChainWait;
-        sm.SetState(BossState.TeleportEnd);
-        stepTimer = teleEndTime;
+        if (meleeAttackPoint == null) return;
+        DoDamageAt(meleeAttackPoint.position, meleeRadius, meleeDamage);
     }
 
-    public void OnTeleportEndFinished()
+    // ═══ 施法→法术 ═══
+
+    private bool TrySpell(float dist)
     {
-        if (step == SubStep.ChainWait)
-            StartRest();
+        if (Time.time < lastSpellTime + spellCooldown) return false;
+
+        state = State.Casting;
+        stateTimer = castingExecTime;
+        lastSpellTime = Time.time;
+        anim.Play("B2_Casting");
+        Invoke(nameof(StartSpellAfterCast), castingExecTime);
+        return true;
+    }
+
+    private void StartSpellAfterCast()
+    {
+        state = State.Spell;
+        stateTimer = spellExecTime;
+        anim.Play("B2_Spell");
+        Invoke(nameof(DoSpellDamage), spellExecTime * 0.5f);
+    }
+
+    private void DoSpellDamage()
+    {
+        Vector2 center = spellAttackPoint != null ? spellAttackPoint.position : transform.position;
+        DoDamageAt(center, spellRadius, spellDamage);
     }
 
     // ═══ 护盾 ═══
 
-    private void ActivateShield()
+    private bool TryShield()
     {
+        if (shieldBroken) return false;
+        if (shieldActive) return false;
+        if (Time.time < lastShieldTime + shieldCooldown) return false;
+
+        state = State.Shielding;
+        stateTimer = shieldExecTime;
+        lastShieldTime = Time.time;
         shieldActive = true;
         shieldCurrentHP = shieldHP;
-        shieldBroken = false;
+        anim.Play("B2_CreateShield");
+        return true;
     }
 
-    /// <summary>护盾吸收伤害，返回穿透伤害</summary>
-    public int AbsorbDamage(int damage)
+    // ═══ 传送 ═══
+
+    private bool TryTeleport()
     {
-        if (!shieldActive) return damage;
+        if (Time.time < lastTeleportTime + teleportCooldown) return false;
 
-        shieldCurrentHP -= damage;
-
-        if (shieldCurrentHP <= 0)
-        {
-            int overflow = -shieldCurrentHP;
-            shieldCurrentHP = 0;
-            shieldActive = false;
-            shieldBroken = true;
-            shieldReactivateTimer = shieldReactivateDelay;
-            return overflow;
-        }
-
-        sm.ShieldHit();
-        return 0;
+        state = State.TeleStart;
+        stateTimer = teleStartTime;
+        lastTeleportTime = Time.time;
+        anim.Play("B2_TeleportStart");
+        Invoke(nameof(DoTeleportArrive), teleStartTime);
+        return true;
     }
 
-    public bool IsShieldActive() => shieldActive;
+    private void DoTeleportArrive()
+    {
+        float dir = Random.value > 0.5f ? 1f : -1f;
+        float d = Random.Range(teleportMinDist, teleportMaxDist);
+        transform.position = (Vector2)transform.position + new Vector2(dir * d, 0f);
+        hoverBaseY = transform.position.y;
 
-    // ═══ 召唤 ═══
+        state = State.TeleEnd;
+        stateTimer = teleEndTime;
+        anim.Play("B2_TeleportEnd");
+    }
 
-    private void DoSummon()
+    // ═══ P2 爆炸 ═══
+
+    private bool TryExplode(float dist)
+    {
+        if (dist > 4f) return false;
+        if (Time.time < lastExplodeTime + explodeCooldown) return false;
+
+        state = State.Exploding;
+        stateTimer = explodeExecTime;
+        lastExplodeTime = Time.time;
+        anim.Play("B2_Explode");
+        Invoke(nameof(DoExplodeDamage), explodeExecTime * 0.5f);
+        return true;
+    }
+
+    private void DoExplodeDamage()
+    {
+        DoDamageAt(transform.position, explodeRadius, explodeDamage);
+    }
+
+    // ═══ P2 召唤 ═══
+
+    private bool TrySummon()
+    {
+        if (Time.time < lastSummonTime + summonCooldown) return false;
+        CleanDeadSummons();
+        if (aliveSummons.Count >= maxSummonsAlive) return false;
+
+        state = State.Summoning;
+        stateTimer = summonExecTime;
+        lastSummonTime = Time.time;
+        anim.Play("B2_Summon");
+        Invoke(nameof(DoSpawnSummon), summonExecTime * 0.4f);
+        return true;
+    }
+
+    private void DoSpawnSummon()
     {
         if (summonPrefab == null) return;
+        CleanDeadSummons();
+        int canSpawn = maxSummonsAlive - aliveSummons.Count;
+        if (canSpawn <= 0) return;
+
         if (summonSpawnPoints != null && summonSpawnPoints.Length > 0)
         {
-            foreach (var sp in summonSpawnPoints)
-                if (sp != null) Instantiate(summonPrefab, sp.position, Quaternion.identity);
+            for (int i = 0; i < Mathf.Min(canSpawn, summonSpawnPoints.Length); i++)
+            {
+                if (summonSpawnPoints[i] != null)
+                    aliveSummons.Add(Instantiate(summonPrefab, summonSpawnPoints[i].position, Quaternion.identity));
+            }
         }
         else
         {
-            for (int i = 0; i < 2; i++)
+            for (int i = 0; i < canSpawn; i++)
             {
-                Vector2 pos = (Vector2)transform.position + Random.insideUnitCircle * 3f;
-                Instantiate(summonPrefab, pos, Quaternion.identity);
+                Vector2 pos = (Vector2)transform.position + Random.insideUnitCircle * 2f;
+                aliveSummons.Add(Instantiate(summonPrefab, pos, Quaternion.identity));
             }
         }
     }
 
-    // ═══ 休息 → 下一轮 ═══
+    private void CleanDeadSummons() => aliveSummons.RemoveAll(s => s == null);
 
-    private void StartRest()
+    // ═══ P2 远程法术 ═══
+
+    private bool TryCastSpell(float dist)
     {
-        DeactivateAllHitboxes();
-        sm.StopMoving();
-        sm.SetState(BossState.Idle);
-        step = SubStep.Rest;
-        stepTimer = restTime;
+        if (Time.time < lastCastSpellTime + castSpellCooldown) return false;
+
+        state = State.CastSpelling;
+        stateTimer = castSpellExecTime;
+        lastCastSpellTime = Time.time;
+        anim.Play("B2_CastSpell");
+        Invoke(nameof(DoCastSpellDamage), castSpellExecTime * 0.5f);
+        return true;
     }
 
-    private void FinishRest()
+    private void DoCastSpellDamage()
     {
-        step = SubStep.Idle;
-        currentAttack = BossState.Idle;
-        idealDist = 0f;
+        Vector2 center = castSpellAttackPoint != null ? castSpellAttackPoint.position : transform.position;
+        DoDamageAt(center, castSpellRadius, castSpellDamage);
     }
 
-    private void DeactivateAllHitboxes()
+    // ═══ 伤害判定 ═══
+
+    private void DoDamageAt(Vector2 center, float radius, int damage)
     {
-        if (meleeHitbox != null) meleeHitbox.Deactivate();
-        if (spellHitbox != null) spellHitbox.Deactivate();
-        if (explodeHitbox != null) explodeHitbox.Deactivate();
+        Collider2D[] hits = Physics2D.OverlapCircleAll(center, radius);
+        foreach (var hit in hits)
+        {
+            if (!hit.CompareTag("Player")) continue;
+            hit.GetComponent<PlayerHealth>()?.TakeDamage(damage);
+        }
     }
-
-    // ═══ 动画事件 ═══
-
-    public void OnAttackEnd()
-    {
-        // 通用攻击结束 — 仅非链条攻击使用
-        if (step == SubStep.Execute
-            && currentAttack != BossState.Casting
-            && currentAttack != BossState.TeleportStart)
-            StartRest();
-    }
-
-    public void OnHitEnd()
-    {
-        if (sm.CurrentState == BossState.Hurt)
-            sm.SetState(BossState.Idle);
-    }
-
-    public void OnSkillEnd() => OnAttackEnd();
 
     // ═══ 受伤 ═══
 
@@ -455,27 +424,56 @@ public class BossAI : MonoBehaviour
     {
         if (isDead) return;
         if (invincibleTimer > 0f) return;
+        if (state == State.PhaseTrans) return;
 
         // 护盾吸收
         if (shieldActive)
         {
-            damage = AbsorbDamage(damage);
-            if (damage <= 0) return;
+            shieldCurrentHP -= damage;
+            if (shieldCurrentHP <= 0)
+            {
+                shieldCurrentHP = 0;
+                shieldActive = false;
+                shieldBroken = true;
+            }
+            state = State.ShieldHit;
+            stateTimer = 0.4f;
+            anim.Play("B2_ShieldHit");
+            return;
         }
 
         currentHealth -= damage;
-        invincibleTimer = 0.3f;
+        invincibleTimer = hurtInvincibleTime;
 
         if (currentHealth <= 0) { Die(); return; }
 
-        // 阶段切换
-        if (!isPhase2 && currentHealth <= maxHealth * 0.5f)
+        // 阶段转换
+        if (!isPhase2 && HealthPercent <= phase2Threshold)
         {
-            isPhase2 = true;
-            sm.SetPhase(BossPhase.Phase2);
+            state = State.PhaseTrans;
+            stateTimer = phaseTransitionTime;
+            anim.Play("B2_PhaseTransition");
+            CancelInvoke();
+            return;
         }
 
-        sm.Hit();
+        // 受伤闪烁
+        state = State.Hurt;
+        stateTimer = 0.5f;
+        StartCoroutine(HurtFlash());
+    }
+
+    private System.Collections.IEnumerator HurtFlash()
+    {
+        if (sr == null) yield break;
+        Color orig = sr.color;
+        for (int i = 0; i < 3; i++)
+        {
+            sr.color = Color.red;
+            yield return new WaitForSeconds(0.08f);
+            sr.color = orig;
+            yield return new WaitForSeconds(0.08f);
+        }
     }
 
     // ═══ 死亡 ═══
@@ -483,8 +481,10 @@ public class BossAI : MonoBehaviour
     private void Die()
     {
         isDead = true;
-        DeactivateAllHitboxes();
-        sm.Die();
+        state = State.Dead;
+        anim.Play("B2_Death");
+        rb.velocity = Vector2.zero;
+        CancelInvoke();
         var col = GetComponent<Collider2D>();
         if (col != null) col.enabled = false;
         enabled = false;
@@ -498,6 +498,7 @@ public class BossAI : MonoBehaviour
         Vector3 p = transform.position;
         Gizmos.color = Color.yellow; Gizmos.DrawWireSphere(p, chaseRange);
         Gizmos.color = Color.cyan; Gizmos.DrawWireSphere(p, idealDistance);
+        Gizmos.color = Color.magenta; Gizmos.DrawWireSphere(p, explodeRadius);
     }
 #endif
 }

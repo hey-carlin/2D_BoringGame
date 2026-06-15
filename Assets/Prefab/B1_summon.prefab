@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &3462527344630701940
+--- !u!1 &6111302691153426473
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,40 +8,40 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 2205260529055624476}
-  - component: {fileID: 4407177702777944491}
-  - component: {fileID: 8615010485683244420}
-  - component: {fileID: 4478801270013543491}
-  - component: {fileID: -3258769528896780791}
+  - component: {fileID: 6945797128958925900}
+  - component: {fileID: 1174264099044648746}
+  - component: {fileID: 4883594654637441918}
+  - component: {fileID: 485127153410180825}
+  - component: {fileID: 1353160306229475252}
   m_Layer: 7
-  m_Name: Boss_spirit
+  m_Name: B1_summon
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &2205260529055624476
+--- !u!4 &6945797128958925900
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3462527344630701940}
+  m_GameObject: {fileID: 6111302691153426473}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 45.72, y: 62.29, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!212 &4407177702777944491
+--- !u!212 &1174264099044648746
 SpriteRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3462527344630701940}
+  m_GameObject: {fileID: 6111302691153426473}
   m_Enabled: 1
   m_CastShadows: 0
   m_ReceiveShadows: 0
@@ -76,28 +76,28 @@ SpriteRenderer:
   m_SortingLayerID: 332736119
   m_SortingLayer: 3
   m_SortingOrder: 0
-  m_Sprite: {fileID: -236627887, guid: cd89bc4f73d55fb418a2e9b39dc7dd80, type: 3}
+  m_Sprite: {fileID: -855300455, guid: e7ef89474f0ae894291f52ca02b84818, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 4, y: 4}
+  m_Size: {x: 0.375, y: 0.375}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
---- !u!95 &8615010485683244420
+--- !u!95 &4883594654637441918
 Animator:
   serializedVersion: 5
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3462527344630701940}
+  m_GameObject: {fileID: 6111302691153426473}
   m_Enabled: 1
   m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: aab6dd67e32699247be07cf96c4c5f25, type: 2}
+  m_Controller: {fileID: 9100000, guid: 0a41b25e937139349a0a4e8343f8f7e9, type: 2}
   m_CullingMode: 0
   m_UpdateMode: 0
   m_ApplyRootMotion: 0
@@ -108,13 +108,13 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
---- !u!58 &4478801270013543491
+--- !u!58 &485127153410180825
 CircleCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3462527344630701940}
+  m_GameObject: {fileID: 6111302691153426473}
   m_Enabled: 1
   m_Density: 1
   m_Material: {fileID: 0}
@@ -140,20 +140,20 @@ CircleCollider2D:
   m_IsTrigger: 1
   m_UsedByEffector: 0
   m_UsedByComposite: 0
-  m_Offset: {x: 0, y: 0}
+  m_Offset: {x: -0.007737696, y: 0}
   serializedVersion: 2
-  m_Radius: 1
---- !u!114 &-3258769528896780791
+  m_Radius: 0.20629153
+--- !u!114 &1353160306229475252
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3462527344630701940}
+  m_GameObject: {fileID: 6111302691153426473}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f0ce344b943aa9943ae72fb9981482e8, type: 3}
+  m_Script: {fileID: 11500000, guid: 8c3216e2a6f7bd94590708043826e1d6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   contactDamage: 10
-  maxHealth: 25
+  maxHealth: 30

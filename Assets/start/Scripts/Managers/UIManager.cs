@@ -18,7 +18,8 @@ namespace DungeonKIT
         List<GameObject> HPUIObjects = new List<GameObject>(); //UI HP list
         public Transform hpParent; //HP parent, position for spawn
         public GameObject hpIconPrefab; //HP prefab for spawn
-        public Sprite hpActiveSprite, hpDisableSprite; //Sprites for HP( 1 hpActive - you have 1 hp, 1 hpDisabled - you have taken damage  )
+        public Sprite hpActiveSprite, hpDisableSprite; //Sprites for HP
+        public int hpPerHeart = 50;                       // 每颗心代表多少HP
 
         public Text moneyText, bottleText, keyText; //UI text
 
@@ -103,27 +104,30 @@ namespace DungeonKIT
         //Update hp method
         public void UpdateHP()
         {
-            //Loop for clear old hp
+            // 清除旧心
             for (int i = 0; i < HPUIObjects.Count; i++)
             {
                 Destroy(HPUIObjects[i]);
             }
-            HPUIObjects.Clear(); //Clear list
+            HPUIObjects.Clear();
 
-            //Loop for spawn new
-            for (int i = 0; i < playerStats.HP.max; i++)
+            int totalHearts = Mathf.CeilToInt((float)playerStats.HP.max / hpPerHeart);
+
+            // 生成心
+            for (int i = 0; i < totalHearts; i++)
             {
-                Image hpIcon = Instantiate(hpIconPrefab, hpParent).GetComponent<Image>(); //Spawn prefab
+                Image hpIcon = Instantiate(hpIconPrefab, hpParent).GetComponent<Image>();
+                int heartThreshold = (i + 1) * hpPerHeart;
 
-                if (playerStats.HP.current > i) //check player hp
+                if (playerStats.HP.current >= heartThreshold)
                 {
-                    hpIcon.sprite = hpActiveSprite; //Set Active hp
+                    hpIcon.sprite = hpActiveSprite;   // 满心
                 }
                 else
                 {
-                    hpIcon.sprite = hpDisableSprite; //Set disable hp
+                    hpIcon.sprite = hpDisableSprite;  // 空心
                 }
-                HPUIObjects.Add(hpIcon.gameObject); //Add object to list
+                HPUIObjects.Add(hpIcon.gameObject);
             }
         }
 

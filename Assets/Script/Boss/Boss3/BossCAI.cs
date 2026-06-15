@@ -1,19 +1,15 @@
 using UnityEngine;
+using Enemy; // IDamageable
 
 /// <summary>
 /// Boss C（空洞骑士风格）：
 ///   追击 + 前摇 + 三种攻击 + 踉跄 + 二阶段。
 /// </summary>
-public class BossCAI : MonoBehaviour
+public class BossCAI : MonoBehaviour, IDamageable
 {
     [Header("移动")]
     public float moveSpeed = 3f;
     public float chaseRange = 8f;
-    public float jumpRange = 5f;
-    public float jumpForce = 10f;
-    public float jumpCooldown = 3f;
-    public LayerMask groundLayer;
-    public float groundRayLength = 1.5f;
     public Color chaseLineColor = Color.yellow;
 
     [Header("攻击")]
@@ -44,7 +40,6 @@ public class BossCAI : MonoBehaviour
     public float p2MoveSpeed = 4.5f;
     public float p2AttackCooldown = 0.5f;
     public float p2TelegraphTime = 0.25f;
-    public float p2JumpCooldown = 2f;
     [Tooltip("二阶段解锁额外攻击（Attack3）")]
     public bool p2UnlockAttack3 = true;
 
@@ -60,15 +55,12 @@ public class BossCAI : MonoBehaviour
     private Transform player;
     private Rigidbody2D rb;
     private Animator anim;
-    private Collider2D bodyCollider;
     private SpriteRenderer sr;
 
     private int currentHealth;
-    private bool isGrounded;
     private bool isDead;
 
     private float lastAttackTime = -999f;
-    private float lastJumpTime = -999f;
     private float invincibleTimer;
 
     private bool canAct = true;
@@ -107,8 +99,8 @@ public class BossCAI : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         anim = GetComponent<Animator>();
         sr = GetComponent<SpriteRenderer>();
-        bodyCollider = GetComponent<Collider2D>();
 
+        // Boss3 是地面单位，保留重力
         currentHealth = maxHealth;
         if (attackPoint != null)
             attackPointDefaultX = Mathf.Abs(attackPoint.localPosition.x);
@@ -118,13 +110,13 @@ public class BossCAI : MonoBehaviour
 
     private void IgnorePlayerCollision()
     {
-        if (player == null || bodyCollider == null) return;
+        if (player == null) return;
         foreach (var pc in player.GetComponents<Collider2D>())
         {
-            if (pc == null || pc.isTrigger) continue;
+            if (pc == null) continue;
             foreach (var bc in GetComponents<Collider2D>())
             {
-                if (bc == null || bc.isTrigger) continue;
+                if (bc == null) continue;
                 Physics2D.IgnoreCollision(pc, bc, true);
             }
         }
@@ -136,17 +128,12 @@ public class BossCAI : MonoBehaviour
     {
         if (isDead || player == null) return;
 
-        // 地面检测
-        isGrounded = Physics2D.Raycast(transform.position, Vector2.down, groundRayLength, groundLayer);
-
         float dist = Vector2.Distance(transform.position, player.position);
         Vector2 dir = (player.position - transform.position).normalized;
 
         // 调试线
         Debug.DrawLine(transform.position, player.position,
             dist <= chaseRange ? chaseLineColor : Color.clear);
-        Debug.DrawRay(transform.position, Vector2.down * groundRayLength,
-            isGrounded ? Color.green : Color.red);
 
         // 朝向 + AttackPoint
         if (Mathf.Abs(dir.x) > 0.05f)
@@ -172,7 +159,7 @@ public class BossCAI : MonoBehaviour
         {
             staggerTimer -= Time.deltaTime;
             rb.velocity = Vector2.zero;
-            anim.SetFloat("moveSpeed", 0f);
+            rb.velocity = Vector2.zero;
             if (staggerTimer <= 0f)
                 EndStagger();
             return;
@@ -185,7 +172,7 @@ public class BossCAI : MonoBehaviour
             if (lockTimer <= 0f) canAct = true; // 超时解锁
             else
             {
-                anim.SetFloat("moveSpeed", 0f);
+                rb.velocity = Vector2.zero;
                 rb.velocity = new Vector2(0f, rb.velocity.y);
                 return;
             }
@@ -196,7 +183,7 @@ public class BossCAI : MonoBehaviour
         {
             telegraphTimer -= Time.deltaTime;
             rb.velocity = Vector2.zero;
-            anim.SetFloat("moveSpeed", 0f);
+            rb.velocity = Vector2.zero;
             if (telegraphTimer <= 0f)
                 ExecuteAttack();
             return;
@@ -209,26 +196,11 @@ public class BossCAI : MonoBehaviour
             return;
         }
 
-        // ── 跳跃 ──
-        float jCd = isPhase2 ? p2JumpCooldown : jumpCooldown;
-        if (isGrounded && dist <= jumpRange && dist > attackRange
-            && Time.time >= lastJumpTime + jCd)
-        {
-            StartJump(dir);
-            return;
-        }
-
         // ── 追击 ──
         if (dist <= chaseRange)
-        {
             rb.velocity = new Vector2(dir.x * currentMoveSpeed, rb.velocity.y);
-            anim.SetFloat("moveSpeed", 1f);
-        }
         else
-        {
             rb.velocity = new Vector2(0f, rb.velocity.y);
-            anim.SetFloat("moveSpeed", 0f);
-        }
     }
 
     // ═══════════ 前摇 → 执行攻击 ═══════════
@@ -269,13 +241,12 @@ public class BossCAI : MonoBehaviour
                 break;
 
             case 2: // 砸地 AOE
-                // 轻微跳起再砸
-                rb.velocity = new Vector2(0f, jumpForce * 0.7f);
+                rb.velocity = new Vector2(0f, 5f);
                 break;
 
             case 3: // P2 额外攻击：突进 AOE
                 float d = sr.flipX ? -1f : 1f;
-                rb.velocity = new Vector2(d * dashForce * 1.2f, jumpForce * 0.5f);
+                rb.velocity = new Vector2(d * dashForce * 1.2f, 4f);
                 break;
         }
     }
@@ -331,17 +302,6 @@ public class BossCAI : MonoBehaviour
         canAct = true;
         lockTimer = 0f;
         aiState = AIState.Idle;
-    }
-
-    // ═══════════ 跳跃 ═══════════
-
-    private void StartJump(Vector2 playerDir)
-    {
-        canAct = false;
-        lockTimer = 1.5f;
-        lastJumpTime = Time.time;
-        rb.velocity = new Vector2(playerDir.x * currentMoveSpeed * 1.5f, jumpForce);
-        anim.SetTrigger("doJump");
     }
 
     public void OnJumpEnd()
@@ -436,7 +396,8 @@ public class BossCAI : MonoBehaviour
         isStaggered = false;
         anim.SetBool("isDead", true);
         rb.velocity = Vector2.zero;
-        if (bodyCollider != null) bodyCollider.enabled = false;
+        var col = GetComponent<Collider2D>();
+        if (col != null) col.enabled = false;
         enabled = false;
     }
 
@@ -446,9 +407,6 @@ public class BossCAI : MonoBehaviour
     private void OnDrawGizmosSelected()
     {
         Vector3 p = transform.position;
-
-        Gizmos.color = Color.green;
-        Gizmos.DrawLine(p, p + Vector3.down * groundRayLength);
 
         if (attackPoint != null)
         {
@@ -463,9 +421,6 @@ public class BossCAI : MonoBehaviour
         Gizmos.DrawWireSphere(p, chaseRange);
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(p, attackRange);
-        Gizmos.color = Color.blue;
-        Gizmos.DrawWireSphere(p, jumpRange);
-
         var playerObj = GameObject.FindGameObjectWithTag("Player");
         if (playerObj != null)
         {

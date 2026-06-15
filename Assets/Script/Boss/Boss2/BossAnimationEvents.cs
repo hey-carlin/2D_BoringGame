@@ -1,16 +1,7 @@
 using UnityEngine;
 
-/// <summary>Boss2 动画事件桥接</summary>
+/// <summary>Boss2 动画事件桥接（精简版，BossAI 用 anim.Play + Invoke 驱动）</summary>
 public class BossAnimationEvents : MonoBehaviour
 {
-    private BossAI ai;
-    private void Start() => ai = GetComponent<BossAI>();
-
-    public void OnCastingFinished()    => ai?.OnCastingFinished();
-    public void OnSpellFinished()      => ai?.OnSpellFinished();
-    public void OnTeleportStartFinished() => ai?.OnTeleportStartFinished();
-    public void OnTeleportEndFinished()   => ai?.OnTeleportEndFinished();
-    public void OnAttackEnd()          => ai?.OnAttackEnd();
-    public void OnHitEnd()             => ai?.OnHitEnd();
-    public void OnSkillEnd()           => ai?.OnSkillEnd();
+    // 保留兼容旧引用，实际动画回调由 BossAI.Invoke 处理
 }
