@@ -30,6 +30,9 @@ public class Scene3MusicController : MonoBehaviour
         // 0. 确保 GameUI 和核心 Manager 存在
         EnsureGameUI();
 
+        // 0.1 确保旧版 PlayerStats 存在并同步新版 PlayerHealth 血量
+        SyncPlayerStats();
+
         // 查找 Player
         var playerObj = GameObject.FindGameObjectWithTag("Player");
         if (playerObj != null)
@@ -55,6 +58,9 @@ public class Scene3MusicController : MonoBehaviour
 
     void Update()
     {
+        // 每帧同步新旧血量系统
+        SyncHP();
+
         if (ended) return;
 
         // 持续查找 Boss（墓碑打碎后才会生成）
@@ -62,6 +68,18 @@ public class Scene3MusicController : MonoBehaviour
         {
             boss = FindObjectOfType<BossCAI>();
             TryBindBossEvents();
+        }
+    }
+
+    /// <summary>同步新版 PlayerHealth → 旧版 PlayerStats → UIManager</summary>
+    private void SyncHP()
+    {
+        if (playerHealth == null || PlayerStats.Instance == null) return;
+        if (PlayerStats.Instance.HP.current != playerHealth.currentHealth)
+        {
+            PlayerStats.Instance.HP.current = playerHealth.currentHealth;
+            PlayerStats.Instance.HP.max = playerHealth.maxHealth;
+            UIManager.Instance?.UpdateUI();
         }
     }
 
@@ -171,6 +189,32 @@ public class Scene3MusicController : MonoBehaviour
                 return true;
         }
         return false;
+    }
+
+    /// <summary>确保旧版 PlayerStats 存在，并从新版 PlayerHealth 同步血量</summary>
+    private void SyncPlayerStats()
+    {
+        // 确保 PlayerStats 存在
+        if (PlayerStats.Instance == null)
+        {
+            var go = new GameObject("[Bootstrap] PlayerStats");
+            DontDestroyOnLoad(go);
+            go.AddComponent<PlayerStats>();
+        }
+
+        // 从新版 PlayerHealth 同步血量到旧版 PlayerStats
+        if (playerHealth == null)
+        {
+            var playerObj = GameObject.FindGameObjectWithTag("Player");
+            if (playerObj != null)
+                playerHealth = playerObj.GetComponent<PlayerHealth>();
+        }
+
+        if (playerHealth != null && PlayerStats.Instance != null)
+        {
+            PlayerStats.Instance.HP.max = playerHealth.maxHealth;
+            PlayerStats.Instance.HP.current = playerHealth.currentHealth;
+        }
     }
 
     // ──── 状态切换 ────

@@ -21,6 +21,9 @@ public class SceneBGMPlayer : MonoBehaviour
         // 1. 确保 GameUI 和核心 Manager 存在
         EnsureGameUI();
 
+        // 1.1 确保旧版 PlayerStats 存在并同步新版 PlayerHealth 血量
+        SyncPlayerStats();
+
         // 2. 播放背景音乐
         if (!playOnStart) return;
 
@@ -32,6 +35,28 @@ public class SceneBGMPlayer : MonoBehaviour
 
         AudioClip clip = bgmClip != null ? bgmClip : AudioManager.Instance.music;
         AudioManager.Instance.PlayMusic(clip);
+    }
+
+    private PlayerHealth cachedPlayerHealth;
+
+    void Update()
+    {
+        // 每帧同步新版 PlayerHealth → 旧版 PlayerStats → UI
+        if (cachedPlayerHealth == null)
+        {
+            var playerObj = GameObject.FindGameObjectWithTag("Player");
+            if (playerObj != null) cachedPlayerHealth = playerObj.GetComponent<PlayerHealth>();
+        }
+
+        if (cachedPlayerHealth != null && PlayerStats.Instance != null)
+        {
+            if (PlayerStats.Instance.HP.current != cachedPlayerHealth.currentHealth)
+            {
+                PlayerStats.Instance.HP.current = cachedPlayerHealth.currentHealth;
+                PlayerStats.Instance.HP.max = cachedPlayerHealth.maxHealth;
+                UIManager.Instance?.UpdateUI();
+            }
+        }
     }
 
     /// <summary>确保核心 Manager 和 GameUI 场景已加载</summary>
@@ -78,6 +103,28 @@ public class SceneBGMPlayer : MonoBehaviour
                 return true;
         }
         return false;
+    }
+
+    /// <summary>确保旧版 PlayerStats 存在，并从新版 PlayerHealth 同步血量</summary>
+    private void SyncPlayerStats()
+    {
+        if (PlayerStats.Instance == null)
+        {
+            var go = new GameObject("[Bootstrap] PlayerStats");
+            DontDestroyOnLoad(go);
+            go.AddComponent<PlayerStats>();
+        }
+
+        var playerObj = GameObject.FindGameObjectWithTag("Player");
+        if (playerObj != null)
+        {
+            var ph = playerObj.GetComponent<PlayerHealth>();
+            if (ph != null && PlayerStats.Instance != null)
+            {
+                PlayerStats.Instance.HP.max = ph.maxHealth;
+                PlayerStats.Instance.HP.current = ph.currentHealth;
+            }
+        }
     }
 
     /// <summary>手动切换背景音乐（可被其他脚本调用）</summary>
