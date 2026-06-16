@@ -22,7 +22,9 @@ namespace Player
         {
             timer = 0.35f;
 
+            // 播放受击音效（协作者本地系统 + 集中式 AudioManager）
             sm.PlaySound(sm.hitSound);
+            DungeonKIT.AudioManager.Instance?.PlaySFX(DungeonKIT.AudioManager.Instance.playerDamage);
 
             // 启动无敌
             sm.isInvincible = true;

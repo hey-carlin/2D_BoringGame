@@ -68,6 +68,10 @@ namespace Player
             sm.SetJumpTrigger();
             sm.PlaySound(sm.jumpSound);
 
+            // 播放跳跃音效
+            if (sm.remainingJumps >= sm.maxJumps - 1)
+                DungeonKIT.AudioManager.Instance?.PlaySFX(DungeonKIT.AudioManager.Instance.playerJump);
+
             // 施力起跳
             sm.rb.velocity = new Vector2(sm.rb.velocity.x, 0f);
             sm.rb.AddForce(Vector2.up * sm.jumpForce, ForceMode2D.Impulse);
@@ -98,6 +102,9 @@ namespace Player
                 sm.remainingJumps--;
                 sm.SetJumpTrigger();
                 sm.PlaySound(sm.jumpSound);
+
+                // 播放二段跳音效
+                DungeonKIT.AudioManager.Instance?.PlaySFX(DungeonKIT.AudioManager.Instance.playerDoubleJump);
 
                 // 二段跳力（略弱于一段）
                 sm.rb.velocity = new Vector2(sm.rb.velocity.x, 0f);

@@ -7,6 +7,9 @@ using Enemy; // IDamageable
 /// </summary>
 public class BossCAI : MonoBehaviour, IDamageable
 {
+    // ──── 公开事件（供音乐系统订阅）────
+    public System.Action OnBossDefeated;
+    public System.Action OnBossPhaseTransition;
     [Header("移动")]
     public float moveSpeed = 3f;
     public float wanderSpeed = 1.5f;        // 游走速度
@@ -272,6 +275,22 @@ public class BossCAI : MonoBehaviour, IDamageable
     /// <summary>攻击判定帧（动画事件）</summary>
     public void OnAttackHit()
     {
+        // 播放攻击音效（近战 / AOE）
+        if (DungeonKIT.AudioManager.Instance != null)
+        {
+            switch (currentAttackIdx)
+            {
+                case 0: // 快速斩击
+                case 1: // 冲锋
+                    DungeonKIT.AudioManager.Instance.PlaySFX(DungeonKIT.AudioManager.Instance.enemyMeleeAttack);
+                    break;
+                case 2: // 砸地 AOE
+                case 3: // P2 突进 AOE
+                    DungeonKIT.AudioManager.Instance.PlaySFX(DungeonKIT.AudioManager.Instance.enemyRangeAttack);
+                    break;
+            }
+        }
+
         int dmg = attackDamage;
         float radius = attackRadius;
 
@@ -343,6 +362,10 @@ public class BossCAI : MonoBehaviour, IDamageable
         invincibleTimer = hurtInvincibleTime;
         hitCounter++;
 
+        // 播放受击音效
+        if (DungeonKIT.AudioManager.Instance != null)
+            DungeonKIT.AudioManager.Instance.PlaySFX(DungeonKIT.AudioManager.Instance.enemyHit);
+
         if (currentHealth <= 0)
         {
             Die();
@@ -402,6 +425,11 @@ public class BossCAI : MonoBehaviour, IDamageable
             anim.SetBool("isPhase2", true);
             aiState = AIState.Idle;
             canAct = true;
+
+            // 播放 Boss 咆哮 + 通知事件
+            if (DungeonKIT.AudioManager.Instance != null)
+                DungeonKIT.AudioManager.Instance.PlaySFX(DungeonKIT.AudioManager.Instance.bossRoar);
+            OnBossPhaseTransition?.Invoke();
         }
     }
 
@@ -417,6 +445,10 @@ public class BossCAI : MonoBehaviour, IDamageable
         var col = GetComponent<Collider2D>();
         if (col != null) col.enabled = false;
         enabled = false;
+
+        // 通知 Boss 被击败 → 触发胜利
+        OnBossDefeated?.Invoke();
+        DungeonKIT.GameManager.Instance?.LevelComplete();
     }
 
     // ═══════════ Gizmos ═══════════

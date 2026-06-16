@@ -9,6 +9,10 @@ using DungeonKIT;
 /// </summary>
 public class PlayerStatsBridge : MonoBehaviour
 {
+    [Header("Prefabs")]
+    [Tooltip("预配置好所有 AudioClip 引用的 AudioManager 预制体")]
+    public GameObject audioManagerPrefab;
+
     private PlayerHealth newHealth;
 
     private void Awake()
@@ -180,10 +184,19 @@ public class PlayerStatsBridge : MonoBehaviour
             return;
         }
 
-        Debug.Log("[Bridge] 创建 AudioManager（DontDestroyOnLoad）...");
-        var go = new GameObject("[Bridge] AudioManager");
-        DontDestroyOnLoad(go);
-        go.AddComponent<AudioManager>();
-        go.AddComponent<AudioSource>();
+        if (audioManagerPrefab != null)
+        {
+            Debug.Log("[Bridge] 从预制体实例化 AudioManager（DontDestroyOnLoad）...");
+            var go = Instantiate(audioManagerPrefab);
+            DontDestroyOnLoad(go);
+        }
+        else
+        {
+            Debug.Log("[Bridge] 创建空 AudioManager（无预制体，音效引用将为空）...");
+            var go = new GameObject("[Bridge] AudioManager");
+            DontDestroyOnLoad(go);
+            go.AddComponent<AudioManager>();
+            go.AddComponent<AudioSource>();
+        }
     }
 }

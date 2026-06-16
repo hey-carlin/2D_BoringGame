@@ -18,6 +18,9 @@ namespace Player
 
             if (isHeavy)
             {
+                // 重击音效
+                DungeonKIT.AudioManager.Instance?.PlaySFX(DungeonKIT.AudioManager.Instance.playerAttackHeavy);
+
                 // 重击定在原地
                 sm.currentMoveSpeed = 0f;
                 sm.rb.velocity = new Vector2(0f, sm.rb.velocity.y);
@@ -25,6 +28,13 @@ namespace Player
             else
             {
                 int attackID = sm.animator.GetInteger("AttackID");
+
+                // 轻攻击音效（上挑 vs 普通）
+                if (attackID == 2)
+                    DungeonKIT.AudioManager.Instance?.PlaySFX(DungeonKIT.AudioManager.Instance.playerAttackUp);
+                else
+                    DungeonKIT.AudioManager.Instance?.PlaySFX(DungeonKIT.AudioManager.Instance.playerAttackLight);
+
                 float stepDir = sm.FacingDirection();
 
                 // 攻击音效
