@@ -38,7 +38,7 @@ namespace DungeonKIT
 
         void FixedUpdate()
         {
-            if (!UIManager.Instance.isPause && GameManager.Instance.isGame) //If pause disable, and is game
+            if (UIManager.Instance != null && !UIManager.Instance.isPause && GameManager.Instance.isGame) //If pause disable, and is game
             {
                 CheckActions();
             }

@@ -67,6 +67,9 @@ namespace DungeonKIT
 
         private void Update()
         {
+            // UIManager 尚未初始化（GameUI 还没加载），跳过本帧
+            if (UIManager.Instance == null) return;
+
             // Don't trigger interaction if dialog/shop UI is already open
             if (UIManager.Instance.isPause) return;
 

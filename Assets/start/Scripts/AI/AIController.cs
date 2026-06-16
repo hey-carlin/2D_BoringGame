@@ -37,7 +37,7 @@ namespace DungeonKIT
 
         private void Update()
         {
-            if (!UIManager.Instance.isPause && GameManager.Instance.isGame) // check for pause and game state
+            if (UIManager.Instance != null && !UIManager.Instance.isPause && GameManager.Instance.isGame) // check for pause and game state
             {
                 Animation(); //Animation logic
                 Move(); // Move logic
