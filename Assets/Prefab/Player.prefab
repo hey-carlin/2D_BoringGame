@@ -308,7 +308,7 @@ MonoBehaviour:
   hitSound: {fileID: 8300000, guid: 8e2f1040042167d4fb3bfb631fa0e283, type: 3}
   invincibilityDuration: 1.2
   hitKnockbackForce: 6
-  showDebugInfo: 1
+  showDebugInfo: 0
   controlsEnabled: 1
   horizontal: 0
   isGrounded: 1

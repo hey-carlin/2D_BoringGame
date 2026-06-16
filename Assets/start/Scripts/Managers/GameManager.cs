@@ -35,13 +35,6 @@ namespace DungeonKIT
         {
             isGame = false; //Game status is false, and all actions on scene is stop
             UIManager.Instance.GameOver(); //Show GameOver screen
-
-            // 播放失败音乐
-            if (AudioManager.Instance != null)
-            {
-                AudioManager.Instance.StopMusic();
-                AudioManager.Instance.PlaySFX(AudioManager.Instance.defeatMusic);
-            }
         }
 
         //Complete level method
@@ -52,13 +45,6 @@ namespace DungeonKIT
             {
                 nextLevelDoor.lockedDoor = false; //Unlock door
                 nextLevelDoor.CheckLockStatus(); //Check door status
-            }
-
-            // 播放胜利音乐
-            if (AudioManager.Instance != null)
-            {
-                AudioManager.Instance.StopMusic();
-                AudioManager.Instance.PlaySFX(AudioManager.Instance.victoryMusic);
             }
         }
     }

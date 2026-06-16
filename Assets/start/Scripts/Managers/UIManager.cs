@@ -64,14 +64,7 @@ namespace DungeonKIT
 
             dialogClosed += CloseShopMenu; //Add event
 
-            // 确保 PlayerStats 存在（直接 Play 场景时可能未创建）
-            if (PlayerStats.Instance == null)
-            {
-                var go = new GameObject("[Bootstrap] PlayerStats");
-                DontDestroyOnLoad(go);
-                go.AddComponent<PlayerStats>();
-            }
-            playerStats = PlayerStats.Instance;
+            playerStats = PlayerStats.Instance; //Set playerstats in static object of PlayerStats
             UpdateUI(); //UpdateUI
 
         }
