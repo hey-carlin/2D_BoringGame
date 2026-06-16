@@ -3,19 +3,14 @@ using DungeonKIT;
 
 /// <summary>
 /// Scene3 动态音乐控制器：
-///   - 场景开始时播放背景音乐（Scene Theme 5 - Loop）
-///   - Boss 战触发时淡入淡出切换到 Boss 主题（Boss Theme 1 - Loop）
-///   - Boss 死亡 / 玩家死亡时停止背景音乐
-///   （胜利/失败音效由 GameManager 统一处理）
+///   - 场景开始时播放背景音乐
+///   - 玩家进入 Boss 区域 → 切换到 Boss 主题
+///   - Boss 死亡 → 停止背景（胜利音效由 GameManager 播放）
+///   - 玩家死亡 → 停止背景（失败音效由 GameManager 播放）
+///   Boss3 由墓碑 Summoner 动态生成，本脚本自动检测并绑定。
 /// </summary>
 public class Scene3MusicController : MonoBehaviour
 {
-    [Header("References")]
-    [Tooltip("Boss GameObject（挂有 BossCAI 组件）")]
-    public BossCAI boss;
-    [Tooltip("玩家 PlayerHealth 组件")]
-    public PlayerHealth playerHealth;
-
     [Header("Music Clips")]
     public AudioClip backgroundBGM;     // Scene Theme 5 - Loop
     public AudioClip bossTheme;         // Boss Theme 1 - Loop
@@ -23,30 +18,30 @@ public class Scene3MusicController : MonoBehaviour
     private enum MusicState { None, BGM, Boss, Ended }
     private MusicState currentState = MusicState.None;
 
+    private BossCAI boss;
+    private PlayerHealth playerHealth;
     private bool bossFightStarted;
+    private bool bossEventsBound;
     private bool ended;
 
     void Start()
     {
-        // 自动查找引用
-        if (boss == null)
-            boss = FindObjectOfType<BossCAI>();
-        if (playerHealth == null)
-        {
-            var playerObj = GameObject.FindGameObjectWithTag("Player");
-            if (playerObj != null)
-                playerHealth = playerObj.GetComponent<PlayerHealth>();
-        }
+        // 查找 Player
+        var playerObj = GameObject.FindGameObjectWithTag("Player");
+        if (playerObj != null)
+            playerHealth = playerObj.GetComponent<PlayerHealth>();
 
-        // 使用 AudioManager 上的 clip（如果有的话），否则使用本地引用
+        // 查找 Boss（可能还未生成，稍后在 Update 中持续查找）
+        boss = FindObjectOfType<BossCAI>();
+        TryBindBossEvents();
+
+        // 使用 AudioManager 上的 clip（如果有的话）
         if (backgroundBGM == null && AudioManager.Instance != null)
             backgroundBGM = AudioManager.Instance.scene3BGM;
         if (bossTheme == null && AudioManager.Instance != null)
             bossTheme = AudioManager.Instance.bossTheme1;
 
-        // 订阅事件
-        if (boss != null)
-            boss.OnBossDefeated += OnBossDefeated;
+        // 订阅玩家死亡
         if (playerHealth != null)
             playerHealth.OnDeath += OnPlayerDeath;
 
@@ -54,17 +49,44 @@ public class Scene3MusicController : MonoBehaviour
         SetState(MusicState.BGM);
     }
 
+    void Update()
+    {
+        if (ended) return;
+
+        // 持续查找 Boss（墓碑打碎后才会生成）
+        if (!bossEventsBound)
+        {
+            boss = FindObjectOfType<BossCAI>();
+            TryBindBossEvents();
+        }
+    }
+
     void OnDestroy()
     {
         if (boss != null)
+        {
             boss.OnBossDefeated -= OnBossDefeated;
+            boss.OnBossPhaseTransition -= OnBossPhaseTransition;
+        }
         if (playerHealth != null)
             playerHealth.OnDeath -= OnPlayerDeath;
     }
 
+    // ──── 尝试绑定 Boss 事件 ────
+
+    private void TryBindBossEvents()
+    {
+        if (bossEventsBound || boss == null) return;
+
+        boss.OnBossDefeated += OnBossDefeated;
+        boss.OnBossPhaseTransition += OnBossPhaseTransition;
+        bossEventsBound = true;
+        Debug.Log("[Scene3MusicController] Boss3 已检测到，事件已绑定");
+    }
+
     // ──── 公开方法（由 BossArenaTrigger 调用）────
 
-    /// <summary>由 Boss 区域触发器调用，开始 Boss 战音乐</summary>
+    /// <summary>玩家进入 Boss 区域时调用，立即切换 Boss 战音乐</summary>
     public void StartBossFight()
     {
         if (!bossFightStarted)
@@ -83,6 +105,11 @@ public class Scene3MusicController : MonoBehaviour
             ended = true;
             SetState(MusicState.Ended);
         }
+    }
+
+    private void OnBossPhaseTransition()
+    {
+        // P1→P2 时咆哮声效由 BossCAI 直接播放
     }
 
     private void OnPlayerDeath()
@@ -114,7 +141,6 @@ public class Scene3MusicController : MonoBehaviour
                 break;
 
             case MusicState.Ended:
-                // 停止背景音乐，胜利/失败音效由 GameManager 播放
                 AudioManager.Instance?.StopMusic();
                 break;
         }

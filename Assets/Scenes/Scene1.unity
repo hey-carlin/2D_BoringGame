@@ -9092,6 +9092,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ba256a82f3da36344823c437c44a272d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  audioManagerPrefab: {fileID: 0}
 --- !u!4 &665138777
 Transform:
   m_ObjectHideFlags: 0
@@ -9586,6 +9587,52 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6757822794488834093, guid: 9322bafa7bbfdee408e30f423c7c4bef, type: 3}
   m_PrefabInstance: {fileID: 5987360571889158531}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &827501788
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 827501790}
+  - component: {fileID: 827501789}
+  m_Layer: 0
+  m_Name: BGMPlayer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &827501789
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 827501788}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e89c0e9dc5f01c7408a3b01642b0e0d9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  bgmClip: {fileID: 8300000, guid: d39d0dbfb4ec0054ba6114086076da15, type: 3}
+  playOnStart: 1
+--- !u!4 &827501790
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 827501788}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 9.951691, y: 3.8701663, z: 1.1382319}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &840017216
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -48515,3 +48562,4 @@ SceneRoots:
   - {fileID: 1513605610}
   - {fileID: 2010104958}
   - {fileID: 1226863162}
+  - {fileID: 827501790}
