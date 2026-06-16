@@ -66,6 +66,7 @@ namespace Player
             // 消耗 1 次跳跃
             sm.remainingJumps--;
             sm.SetJumpTrigger();
+            sm.PlaySound(sm.jumpSound);
 
             // 施力起跳
             sm.rb.velocity = new Vector2(sm.rb.velocity.x, 0f);
@@ -96,6 +97,7 @@ namespace Player
                 sm.jumpBufferTimer = 0f;
                 sm.remainingJumps--;
                 sm.SetJumpTrigger();
+                sm.PlaySound(sm.jumpSound);
 
                 // 二段跳力（略弱于一段）
                 sm.rb.velocity = new Vector2(sm.rb.velocity.x, 0f);

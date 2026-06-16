@@ -38,6 +38,17 @@ namespace Player
         public float attackForwardStep = 2.5f;
         public float attack2JumpForce = 8f;              // Attack2 (W+J) 跳击力度
 
+        [Header("音效")]
+        public AudioSource audioSource;         // 一次性音效
+        public AudioSource runAudioSource;      // 跑步循环音效
+        public AudioClip spawnSound;
+        public AudioClip runSound;
+        public AudioClip attack1Sound;
+        public AudioClip attack2Sound;
+        public AudioClip attack3Sound;
+        public AudioClip jumpSound;
+        public AudioClip hitSound;
+
         [Header("Damage")]
         public float invincibilityDuration = 1.2f;
         public float hitKnockbackForce = 6f;
@@ -104,10 +115,48 @@ namespace Player
 
         void Start()
         {
+            if (audioSource == null) audioSource = GetComponent<AudioSource>();
+            if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
+
             controlsEnabled = true;
             isInvincible = false;
             remainingJumps = maxJumps;
             ChangeState(idleState);
+
+            // 生成音效
+            PlaySound(spawnSound);
+        }
+
+        /// <summary>播放一次性音效</summary>
+        public void PlaySound(AudioClip clip)
+        {
+            if (clip == null || audioSource == null) return;
+            audioSource.PlayOneShot(clip);
+        }
+
+        /// <summary>每帧更新跑步音效——地上移动时播放，否则停止</summary>
+        private void UpdateRunSound()
+        {
+            if (runAudioSource == null || runSound == null) return;
+
+            bool shouldRun = isGrounded && Mathf.Abs(horizontal) > 0.1f
+                          && currentState != attackState
+                          && currentState != hitState;
+
+            if (shouldRun)
+            {
+                if (!runAudioSource.isPlaying)
+                {
+                    runAudioSource.clip = runSound;
+                    runAudioSource.loop = true;
+                    runAudioSource.Play();
+                }
+            }
+            else
+            {
+                if (runAudioSource.isPlaying)
+                    runAudioSource.Stop();
+            }
         }
 
         void Update()
@@ -263,6 +312,7 @@ namespace Player
             }
 
             currentState?.OnUpdate();
+            UpdateRunSound();
         }
 
         void FixedUpdate()

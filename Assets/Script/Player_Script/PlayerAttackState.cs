@@ -27,6 +27,14 @@ namespace Player
                 int attackID = sm.animator.GetInteger("AttackID");
                 float stepDir = sm.FacingDirection();
 
+                // 攻击音效
+                switch (attackID)
+                {
+                    case 1: sm.PlaySound(sm.attack1Sound); break;
+                    case 2: sm.PlaySound(sm.attack2Sound); break;
+                    case 3: sm.PlaySound(sm.attack3Sound); break;
+                }
+
                 if (attackID == 1)
                 {
                     // Attack1 (J) 原地攻击，不移动

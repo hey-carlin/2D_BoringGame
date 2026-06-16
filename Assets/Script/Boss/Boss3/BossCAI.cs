@@ -9,7 +9,10 @@ public class BossCAI : MonoBehaviour, IDamageable
 {
     [Header("移动")]
     public float moveSpeed = 3f;
+    public float wanderSpeed = 1.5f;        // 游走速度
     public float chaseRange = 8f;
+    public float wanderMinTime = 1f;        // 游走单次最短时间
+    public float wanderMaxTime = 3f;        // 游走单次最长时间
     public Color chaseLineColor = Color.yellow;
 
     [Header("攻击")]
@@ -62,6 +65,8 @@ public class BossCAI : MonoBehaviour, IDamageable
 
     private float lastAttackTime = -999f;
     private float invincibleTimer;
+    private float wanderTimer;              // 游走方向切换计时
+    private float wanderDir = 1f;           // 当前游走方向
 
     private bool canAct = true;
     private int currentAttackIdx;
@@ -196,11 +201,24 @@ public class BossCAI : MonoBehaviour, IDamageable
             return;
         }
 
-        // ── 追击 ──
+        // ── 追击 / 游走 ──
         if (dist <= chaseRange)
+        {
+            // 玩家在范围内 → 追击
             rb.velocity = new Vector2(dir.x * currentMoveSpeed, rb.velocity.y);
+        }
         else
-            rb.velocity = new Vector2(0f, rb.velocity.y);
+        {
+            // 玩家不在 → 随机游走
+            wanderTimer -= Time.deltaTime;
+            if (wanderTimer <= 0f)
+            {
+                wanderTimer = Random.Range(wanderMinTime, wanderMaxTime);
+                wanderDir = Random.value > 0.5f ? 1f : -1f;
+            }
+            rb.velocity = new Vector2(wanderDir * wanderSpeed, rb.velocity.y);
+            sr.flipX = wanderDir < 0;
+        }
     }
 
     // ═══════════ 前摇 → 执行攻击 ═══════════

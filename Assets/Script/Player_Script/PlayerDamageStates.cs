@@ -20,9 +20,11 @@ namespace Player
 
         public override void OnEnter()
         {
-            timer = 0.35f;                               // 硬直动画时长
+            timer = 0.35f;
 
-            // 启动无敌（由 PlayerStateMachine 统一倒计时）
+            sm.PlaySound(sm.hitSound);
+
+            // 启动无敌
             sm.isInvincible = true;
             sm.invincibilityTimer = sm.invincibilityDuration;
             hasFlash = false;
