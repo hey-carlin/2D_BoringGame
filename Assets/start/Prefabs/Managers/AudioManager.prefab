@@ -1,21 +1,11 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1001 &100100000
-Prefab:
-  m_ObjectHideFlags: 1
-  serializedVersion: 2
-  m_Modification:
-    m_TransformParent: {fileID: 0}
-    m_Modifications: []
-    m_RemovedComponents: []
-  m_SourcePrefab: {fileID: 0}
-  m_RootGameObject: {fileID: 1216734199880306}
-  m_IsPrefabAsset: 1
 --- !u!1 &1216734199880306
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInternal: {fileID: 100100000}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4121010794033396}
@@ -31,22 +21,63 @@ GameObject:
   m_IsActive: 1
 --- !u!4 &4121010794033396
 Transform:
-  m_ObjectHideFlags: 1
+  m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInternal: {fileID: 100100000}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1216734199880306}
+  serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &114072394618895458
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1216734199880306}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 610e609f6fec49e41a454d0ff93f2837, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  aiDamage: {fileID: 8300000, guid: 72938a9af1b2e6248953064e7d8e92c3, type: 3}
+  playerDamage: {fileID: 8300000, guid: 8e2f1040042167d4fb3bfb631fa0e283, type: 3}
+  pickUpKey: {fileID: 0}
+  pickUpItems: {fileID: 8300000, guid: d5877d993611adc45b789225abfc9456, type: 3}
+  pickUpCoin: {fileID: 8300000, guid: d5877d993611adc45b789225abfc9456, type: 3}
+  openDoor: {fileID: 0}
+  drinkBottle: {fileID: 0}
+  music: {fileID: 8300000, guid: e110c3e579aec6d4dbcbc10942c6c729, type: 3}
+  scene3BGM: {fileID: 8300000, guid: f294549673abd8f4faf51b9f1622d753, type: 3}
+  bossTheme1: {fileID: 8300000, guid: 02df3b8bd9d5cdc4ea12d0dd9ef210e7, type: 3}
+  bossTheme2: {fileID: 8300000, guid: 176adde63b7333f4599b32612f018174, type: 3}
+  victoryMusic: {fileID: 8300000, guid: afcf4ad8abd888242999121bc659d279, type: 3}
+  defeatMusic: {fileID: 8300000, guid: c8bbc93baa3a4c7418c7bd4942e3586a, type: 3}
+  playerJump: {fileID: 0}
+  playerDoubleJump: {fileID: 8300000, guid: 85bceb00ac8f6144089e511eefbc35f9, type: 3}
+  playerAttackLight: {fileID: 8300000, guid: 0e3aad7dd213bd7468073e73a713ef33, type: 3}
+  playerAttackHeavy: {fileID: 0}
+  playerAttackUp: {fileID: 8300000, guid: 20053a21c2294fc46bd3b9b6a77b477f, type: 3}
+  playerGlide: {fileID: 8300000, guid: 230c1a1d12901134b9d60717d1783c4e, type: 3}
+  playerAppear: {fileID: 8300000, guid: 06a2918a73986c6429a2e5aef3754448, type: 3}
+  bossRoar: {fileID: 8300000, guid: cceb4f91c8e202c47af32af2d5f8d4fc, type: 3}
+  enemyHit: {fileID: 8300000, guid: 9e6922069f47fac4db2107048a3cfb58, type: 3}
+  enemyMeleeAttack: {fileID: 8300000, guid: 3096a48d28f35734393d07fc59db19ef, type: 3}
+  enemyRangeAttack: {fileID: 8300000, guid: 61be6a4824e803d4593598becf9ffb70, type: 3}
+  sfxVolume: 0.8
+  musicVolume: 0.6
 --- !u!82 &82944301760250114
 AudioSource:
-  m_ObjectHideFlags: 1
+  m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInternal: {fileID: 100100000}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1216734199880306}
   m_Enabled: 1
   serializedVersion: 4
@@ -137,25 +168,12 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
---- !u!114 &114072394618895458
-MonoBehaviour:
-  m_ObjectHideFlags: 1
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInternal: {fileID: 100100000}
-  m_GameObject: {fileID: 1216734199880306}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 610e609f6fec49e41a454d0ff93f2837, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  aiDamage: {fileID: 8300000, guid: 72938a9af1b2e6248953064e7d8e92c3, type: 3}
-  playerDamage: {fileID: 8300000, guid: 8e2f1040042167d4fb3bfb631fa0e283, type: 3}
-  music: {fileID: 8300000, guid: e110c3e579aec6d4dbcbc10942c6c729, type: 3}
 --- !u!114 &114405801677640032
 MonoBehaviour:
-  m_ObjectHideFlags: 1
+  m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInternal: {fileID: 100100000}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1216734199880306}
   m_Enabled: 1
   m_EditorHideFlags: 0
