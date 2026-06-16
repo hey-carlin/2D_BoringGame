@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using DungeonKIT;
 
 /// <summary>
@@ -26,6 +27,9 @@ public class Scene3MusicController : MonoBehaviour
 
     void Start()
     {
+        // 0. 确保 GameUI 和核心 Manager 存在
+        EnsureGameUI();
+
         // 查找 Player
         var playerObj = GameObject.FindGameObjectWithTag("Player");
         if (playerObj != null)
@@ -119,6 +123,54 @@ public class Scene3MusicController : MonoBehaviour
             ended = true;
             SetState(MusicState.Ended);
         }
+    }
+
+    // ──── GameUI 加载 ────
+
+    /// <summary>确保核心 Manager 和 GameUI 场景已加载</summary>
+    private void EnsureGameUI()
+    {
+        // 确保 ScenesManager 单例存在
+        if (ScenesManager.Instance == null)
+        {
+            var go = new GameObject("[Bootstrap] ScenesManager");
+            DontDestroyOnLoad(go);
+            go.AddComponent<ScenesManager>();
+        }
+
+        // 确保 AudioManager 单例存在（直接 Play Scene3 时 MainMenu 未加载）
+        if (AudioManager.Instance == null)
+        {
+            var go = new GameObject("[Bootstrap] AudioManager");
+            DontDestroyOnLoad(go);
+            go.AddComponent<AudioSource>();
+            go.AddComponent<AudioManager>();
+        }
+
+        // 确保 GameManager 单例存在
+        if (GameManager.Instance == null)
+        {
+            var go = new GameObject("[Bootstrap] GameManager");
+            DontDestroyOnLoad(go);
+            go.AddComponent<GameManager>();
+        }
+
+        // 加载 GameUI 叠加场景（避免重复）
+        if (!IsSceneLoaded("GameUI"))
+        {
+            ScenesManager.Instance.LoadAdditiveScene("GameUI");
+            Debug.Log("[Scene3MusicController] GameUI 场景已加载");
+        }
+    }
+
+    private bool IsSceneLoaded(string sceneName)
+    {
+        for (int i = 0; i < SceneManager.sceneCount; i++)
+        {
+            if (SceneManager.GetSceneAt(i).name == sceneName)
+                return true;
+        }
+        return false;
     }
 
     // ──── 状态切换 ────
