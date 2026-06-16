@@ -19,3 +19,16 @@ MemoryCaptures/
 # OS
 .DS_Store
 Thumbs.db
+
+# Source art files (Unity uses PNG at runtime, PSD/PSB are editing sources)
+*.psd
+*.psb
+*.tga
+*.tiff
+
+# Unity auto-generated
+UpgradeLog.htm
+
+# Redundant source art folders
+**/!PSD/
+**/!PSB/
